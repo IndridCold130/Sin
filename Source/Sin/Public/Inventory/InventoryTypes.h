@@ -104,7 +104,7 @@ struct FItemContainer : public FTableRowBase
 	int32 Index = -1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameItem")
-	UGameItemBase* Item;
+	UGameItemBase* Item = nullptr;
 
 };
 
@@ -135,7 +135,7 @@ struct FItemBase : public FTableRowBase
 	TSoftObjectPtr<USoundBase> ItemPickedUpSFX;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameItem")
-	int32 MaxStack;
+	int32 MaxStack = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameItem")
 	float Weight = 1.f;
