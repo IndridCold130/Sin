@@ -61,42 +61,32 @@ bool UInventory::ReplicateSubobjects(UActorChannel* Channel, FOutBunch* Bunch, F
 }
 
 void UInventory::FindFirstFreeSlot(bool& Found, int32& FoundIndex, int32 StartingIndex)
-{	
-	int32 LocStartingIndex = StartingIndex;
-	for (int32 i = StartingIndex; i < InventorySize; i++)
+{
+	Found = false;
+	FoundIndex = INDEX_NONE;
+
+	if (InventorySize <= 0)
 	{
-		if (!Container.IsValidIndex(i))
+		return;
+	}
+
+	const int32 ClampedStartingIndex = FMath::Clamp(StartingIndex, 0, InventorySize - 1);
+
+	for (int32 Index = ClampedStartingIndex; Index < InventorySize; ++Index)
+	{
+		if (!Container.IsValidIndex(Index) || !IsValid(Container[Index]))
 		{
-			Found = true;
-			FoundIndex = i;
-			return;
-		}
-		else if (!IsValid(Container[i]))
-		{
-			if (Container.IsValidIndex(i))
-			{
-				if (!IsValid(Container[i]))
-				{
-					Found = true;
-					FoundIndex = i;
-					return;
-				}
-			}
+			Found = true; FoundIndex = Index; return;
 		}
 	}
-	if (StartingIndex > 0)
+
+	for (int32 Index = 0; Index < ClampedStartingIndex; ++Index)
 	{
-		for (int32 ii = 0; ii < StartingIndex; ii++)
+		if (!Container.IsValidIndex(Index) || !IsValid(Container[Index]))
 		{
-			if (!IsValid(Container[ii]))
-			{
-				Found = true;
-				FoundIndex = ii;
-				return;
-			}
+			Found = true; FoundIndex = Index; return;
 		}
 	}
-	return;
 }
 
 bool UInventory::IsValidID(FName ID, EPrimaryItemType Type)
