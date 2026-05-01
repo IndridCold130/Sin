@@ -229,66 +229,127 @@ bool UInventory::AttemptMerchantTransaction_Validate(UGameItemBase* Item) { retu
 
 void UInventory::CreateItem(FName ID, EPrimaryItemType Type, int32 Quantity, bool& Created, UGameItemBase*& CreatedItem)
 {
-		if (Type == EPrimaryItemType::Equipment)
-		{
-			FEquipmentItem* LocalRow = ItemDataTables[EPrimaryItemType::Equipment]->FindRow<FEquipmentItem>(ID, TEXT("ContextString"), true);
-			if (LocalRow)
-			{
-				TSubclassOf<UGameItemEquipment> DefaultClass = UGameItemEquipment::StaticClass();
-				UGameItemEquipment* LocalItem = NewObject<UGameItemEquipment>(this, LocalRow->ItemClass->IsChildOf(DefaultClass) ? LocalRow->ItemClass : DefaultClass);
-				LocalItem->MaxStack = LocalRow->MaxStack;
-				LocalItem->InitGameItemVars(ID, LocalRow->ItemTags, ItemDataTables[EPrimaryItemType::Equipment], Quantity);
-				LocalItem->EquipmentData = *LocalRow;
-				LocalItem->PrimaryType = Type;
-				Created = true;
-				CreatedItem = LocalItem;
-				return;
-			}
-			return;
-		}
-		if (Type == EPrimaryItemType::Weapon)
-		{
-			FSinWeapon* LocalRow = ItemDataTables[EPrimaryItemType::Weapon]->FindRow<FSinWeapon>(ID, TEXT("ContextString"), true);
-			if (LocalRow)
-			{
-				UGameItemWeapon* LocalWeapon = NewObject<UGameItemWeapon>(this);
-				LocalWeapon->InitGameItemVars(ID, LocalRow->ItemTags, ItemDataTables[EPrimaryItemType::Weapon]);
-				LocalWeapon->Stack = FMath::Clamp(Quantity, 1, LocalRow->MaxStack);
-				LocalWeapon->EquipmentData.Price = LocalRow->Price;
-				LocalWeapon->PrimaryType = Type;
-				Created = true;
-				CreatedItem = LocalWeapon;
-				return;
-			}
-		}
-		if (!ItemDataTables.Contains(EPrimaryItemType::Regular))
-		{
-			return;
-		}
-		FItemBase* LocalRow = ItemDataTables[EPrimaryItemType::Regular]->FindRow<FItemBase>(ID, TEXT("ContextString"), true);
-		if (LocalRow)
-		{
-			TSubclassOf<UGameItemBase> DefaultClass = UGameItemBase::StaticClass();
-			UGameItemBase* LocalItem = NewObject<UGameItemBase>(this, LocalRow->ItemClass->IsChildOf(DefaultClass) ? LocalRow->ItemClass : DefaultClass);
-			if(LocalItem->InitGameItemVars(ID, LocalRow->ItemTags, ItemDataTables[EPrimaryItemType::Regular]))
-			{
-				LocalItem->DefaultData = *LocalRow;
-				if (LocalItem)
-				{
-					LocalItem->Stack = FMath::Clamp(Quantity, 1, LocalRow->MaxStack);
-					LocalItem->PrimaryType = Type;
-					Created = true;
-					CreatedItem = LocalItem;
-					return;
-				}
-				Created = false;
-				CreatedItem = nullptr;
-				return;
-			}
-		}
 	Created = false;
 	CreatedItem = nullptr;
-	return;
+
+	if (ID.IsNone() || Quantity <= 0)
+	{
+		return;
+	}
+
+	if (Type == EPrimaryItemType::Equipment)
+	{
+		UDataTable* const* FoundTable = ItemDataTables.Find(EPrimaryItemType::Equipment);
+		if (!FoundTable || !*FoundTable)
+		{
+			return;
+		}
+
+		FEquipmentItem* LocalRow = (*FoundTable)->FindRow<FEquipmentItem>(ID, TEXT("ContextString"), true);
+		if (!LocalRow)
+		{
+			return;
+		}
+
+		TSubclassOf<UGameItemEquipment> DefaultClass = UGameItemEquipment::StaticClass();
+		TSubclassOf<UGameItemEquipment> ItemClass = DefaultClass;
+
+		if (LocalRow->ItemClass && LocalRow->ItemClass->IsChildOf(DefaultClass))
+		{
+			ItemClass = LocalRow->ItemClass;
+		}
+
+		UGameItemEquipment* LocalItem = NewObject<UGameItemEquipment>(this, ItemClass);
+		if (!LocalItem)
+		{
+			return;
+		}
+
+		LocalItem->MaxStack = LocalRow->MaxStack;
+
+		if (!LocalItem->InitGameItemVars(ID, LocalRow->ItemTags, *FoundTable, Quantity))
+		{
+			return;
+		}
+
+		LocalItem->EquipmentData = *LocalRow;
+		LocalItem->PrimaryType = Type;
+
+		Created = true; CreatedItem = LocalItem; return;
+	}
+
+	if (Type == EPrimaryItemType::Weapon)
+	{
+		UDataTable* const* FoundTable = ItemDataTables.Find(EPrimaryItemType::Weapon);
+		if (!FoundTable || !*FoundTable)
+		{
+			return;
+		}
+
+		FSinWeapon* LocalRow = (*FoundTable)->FindRow<FSinWeapon>(ID, TEXT("ContextString"), true);
+		if (!LocalRow)
+		{
+			return;
+		}
+
+		UGameItemWeapon* LocalWeapon = NewObject<UGameItemWeapon>(this);
+		if (!LocalWeapon)
+		{
+			return;
+		}
+
+		LocalWeapon->MaxStack = LocalRow->MaxStack;
+
+		if (!LocalWeapon->InitGameItemVars(ID, LocalRow->ItemTags, *FoundTable, Quantity))
+		{
+			return;
+		}
+
+		LocalWeapon->Stack = FMath::Clamp(Quantity, 1, LocalRow->MaxStack);
+		LocalWeapon->EquipmentData.Price = LocalRow->Price;
+		LocalWeapon->PrimaryType = Type;
+
+		Created = true; CreatedItem = LocalWeapon; return;
+	}
+
+	UDataTable* const* FoundTable = ItemDataTables.Find(EPrimaryItemType::Regular);
+	if (!FoundTable || !*FoundTable)
+	{
+		return;
+	}
+
+	FItemBase* LocalRow = (*FoundTable)->FindRow<FItemBase>(ID, TEXT("ContextString"), true);
+	if (!LocalRow)
+	{
+		return;
+	}
+
+	TSubclassOf<UGameItemBase> DefaultClass = UGameItemBase::StaticClass();
+	TSubclassOf<UGameItemBase> ItemClass = DefaultClass;
+
+	if (LocalRow->ItemClass && LocalRow->ItemClass->IsChildOf(DefaultClass))
+	{
+		ItemClass = LocalRow->ItemClass;
+	}
+
+	UGameItemBase* LocalItem = NewObject<UGameItemBase>(this, ItemClass);
+	if (!LocalItem)
+	{
+		return;
+	}
+
+	LocalItem->MaxStack = LocalRow->MaxStack;
+
+	if (!LocalItem->InitGameItemVars(ID, LocalRow->ItemTags, *FoundTable, Quantity))
+	{
+		return;
+	}
+
+	LocalItem->DefaultData = *LocalRow;
+	LocalItem->Stack = FMath::Clamp(Quantity, 1, LocalRow->MaxStack);
+	LocalItem->PrimaryType = Type;
+
+	Created = true; CreatedItem = LocalItem; return;
 }
 
 void UInventory::TryAddItem(UGameItemBase* Item, int32 TargetIndex, bool& Success, int32 SrcIndex)
