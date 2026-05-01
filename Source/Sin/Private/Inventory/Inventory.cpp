@@ -91,8 +91,19 @@ void UInventory::FindFirstFreeSlot(bool& Found, int32& FoundIndex, int32 Startin
 
 bool UInventory::IsValidID(FName ID, EPrimaryItemType Type)
 {
-	FItemBase* LocalRow = ItemDataTables[Type]->FindRow<FItemBase>(ID, TEXT("ContextString"), true);
-	return (LocalRow != nullptr);
+	if (ID.IsNone())
+	{
+		return false;
+	}
+
+	UDataTable* const* FoundTable = ItemDataTables.Find(Type);
+	if (!FoundTable || !*FoundTable)
+	{
+		return false;
+	}
+
+	FItemBase* LocalRow = (*FoundTable)->FindRow<FItemBase>(ID, TEXT("ContextString"), true);
+	return LocalRow != nullptr;
 }
 
 int32 UInventory::InventoryItemCount()
