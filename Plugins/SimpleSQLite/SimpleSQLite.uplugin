@@ -1,0 +1,29 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "SimpleSQLite",
+	"Description": "This simple plugin allows you to perform common operations on SQLite database.",
+	"Category": "PatrolCat",
+	"CreatedBy": "PatrolCat",
+	"CreatedByURL": "",
+	"DocsURL": "https://github.com/sitonmoon/UE4SimpleSQLite",
+	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/e9f2d8133a524268ba723a881895104d",
+	"SupportURL": "https://www.bilibili.com/video/BV1qr4y117L4",
+	"EngineVersion": "5.3.0",
+	"CanContainContent": true,
+	"Installed": true,
+	"Modules": [
+		{
+			"Name": "SimpleSQLite",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "SQLiteSupport",
+			"Enabled": true
+		}
+	]
+}

@@ -1,0 +1,15 @@
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Content/
+.vs/
+.vscode/
+.idea/
+SourceFiles/
+Backup/
+Backup1/
+.vsconfig/
+*.sln
+UpgradeLog*.htm
+ReadMe.txt
