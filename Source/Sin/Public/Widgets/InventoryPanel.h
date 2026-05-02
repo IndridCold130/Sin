@@ -91,6 +91,7 @@ protected:
 	FGameplayTag InventoryType = TAG_Item;
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void ManageInventorySlots(int32 Slots, bool bPreview = false);
+	UInventorySlot* FindSlotWidgetByInventoryIndex(int32 InventoryIndex) const;
 	void GetWidgetsOfClassUnderParent(TSubclassOf<UInventorySlot> WidgetClass, TArray<UInventorySlot*>& FoundWidgets);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true))
 	TSoftObjectPtr<UTexture2D> DefaultPreviewIcon;

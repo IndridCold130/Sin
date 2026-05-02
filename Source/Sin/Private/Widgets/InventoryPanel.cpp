@@ -59,19 +59,45 @@ void UInventoryPanel::MoveItemClient(UInventoryPanel* Panel, int32 OldIndex, int
 
 void UInventoryPanel::ItemAdded(UInventory* NewInventory, int32 Index, UGameItemBase* Item, int32 SrcIndex, UInventory* SrcInventory)
 {
-		Cast<UInventorySlot>(SlotGrid->GetChildAt(Index))->RefreshSlot(Item);
-		UPlayerInventoryView* InventoryParent = GetTypedOuter<UPlayerInventoryView>();
-		if (InventoryParent)
-		{
-			float Weight=0.0f;
-			float EquipWeight=0.0f;
-			InventoryParent->RecalculateWeight(DataHolder, Weight, EquipWeight);
-		}
+	if (!SlotGrid)
+	{
+		return;
+	}
+
+	if (bItemList)
+	{
+		ManageInventorySlots(DataHolder ? DataHolder->InventorySize : 0);
+	}
+	else if (UInventorySlot* SlotWidget = FindSlotWidgetByInventoryIndex(Index))
+	{
+		SlotWidget->RefreshSlot(Item);
+	}
+
+	UPlayerInventoryView* InventoryParent = GetTypedOuter<UPlayerInventoryView>();
+	if (InventoryParent)
+	{
+		float Weight = 0.0f;
+		float EquipWeight = 0.0f;
+		InventoryParent->RecalculateWeight(DataHolder, Weight, EquipWeight);
+	}
 }
 
 void UInventoryPanel::ItemRemoved(UInventory* NewInventory, int32 Index, UGameItemBase* Item, int32 SrcIndex, UInventory* SrcInventory)
 {
-	Cast<UInventorySlot>(SlotGrid->GetChildAt(Index))->RefreshSlot(nullptr);
+	if (!SlotGrid)
+	{
+		return;
+	}
+
+	if (bItemList)
+	{
+		ManageInventorySlots(DataHolder ? DataHolder->InventorySize : 0);
+	}
+	else if (UInventorySlot* SlotWidget = FindSlotWidgetByInventoryIndex(Index))
+	{
+		SlotWidget->RefreshSlot(nullptr);
+	}
+
 	UPlayerInventoryView* InventoryParent = GetTypedOuter<UPlayerInventoryView>();
 	if (InventoryParent)
 	{
@@ -255,7 +281,16 @@ void UInventoryPanel::SetInventoryData(AActor* Owner)
 
 void UInventoryPanel::ManageInventorySlots(int32 Slots, bool bPreview)
 {
-	//SlotGrid->ClearChildren();
+	if (!SlotGrid)
+	{
+		return;
+	}
+
+	if (bItemList && !bPreview)
+	{
+		SlotGrid->ClearChildren();
+	}
+
 	TArray<UInventorySlot*> LocalSlots;
 	GetWidgetsOfClassUnderParent(UInventorySlot::StaticClass(), LocalSlots);
 	int32 Skippabili = 0;
@@ -307,6 +342,27 @@ void UInventoryPanel::ManageInventorySlots(int32 Slots, bool bPreview)
 			LocalSlot->MasterPanel = this;
 		}
 	}
+}
+
+UInventorySlot* UInventoryPanel::FindSlotWidgetByInventoryIndex(int32 InventoryIndex) const
+{
+	if (!SlotGrid)
+	{
+		return nullptr;
+	}
+
+	const int32 ChildCount = SlotGrid->GetChildrenCount();
+
+	for (int32 ChildIndex = 0; ChildIndex < ChildCount; ++ChildIndex)
+	{
+		UInventorySlot* SlotWidget = Cast<UInventorySlot>(SlotGrid->GetChildAt(ChildIndex));
+		if (SlotWidget && SlotWidget->SlotIndex == InventoryIndex)
+		{
+			return SlotWidget;
+		}
+	}
+
+	return nullptr;
 }
 
 void UInventoryPanel::GetWidgetsOfClassUnderParent(TSubclassOf<UInventorySlot> WidgetClass, TArray<UInventorySlot*>& FoundWidgets)

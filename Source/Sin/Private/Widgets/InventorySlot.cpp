@@ -82,9 +82,20 @@ TSoftObjectPtr<UTexture2D> UInventorySlot::GetDefaultPreviewIcon()
 void UInventorySlot::RefreshSlot_Implementation(UGameItemBase* Item)
 {
 	SlottedItem = Item;
+
+	if (!SlotImg)
+	{
+		return;
+	}
+
 	if (Item)
 	{
 		SlotImg->SetItemIconImage_Implementation(Item->GetIcon());
+		SlotImg->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	else
+	{
+		SlotImg->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
 
