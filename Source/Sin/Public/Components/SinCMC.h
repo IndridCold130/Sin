@@ -23,8 +23,8 @@ public:
 	virtual float GetMaxSpeed() const override;
 	UPROPERTY()
 	TObjectPtr<USinASC> GameplayAbilityComponent;
-	uint8 FLAG_Sprint : 1;
-	uint8 FLAG_Cast : 2;
+	uint8 FLAG_Sprint : 1 = 0;
+	uint8 FLAG_Cast : 1 = 0;
 
 	UFUNCTION(BlueprintCallable, Category = "SinMovement")
 	void SetMovementModeFlag(bool Add, EMovementModifier Flag);
@@ -48,8 +48,8 @@ public:
 	virtual void PrepMoveFor(ACharacter* C) override;
 	virtual bool CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const override;
 
-	uint8 bSavedWantsToSprint : 1;
-	uint8 bSavedWantsToCast : 1;
+	uint8 bSavedWantsToSprint : 1 = 0;
+	uint8 bSavedWantsToCast : 1 = 0;
 
 };
 class FSinPredictionData_Client_Character : public FNetworkPredictionData_Client_Character

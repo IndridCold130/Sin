@@ -594,8 +594,7 @@ void UInventory::MoveItemDeux_Implementation(UGameItemBase* Item, int32 DstIndex
 	const int32 OldIndex = Item->CurrentIndex;
 	UInventory* OldOwner = Item->Owner;
 
-	bool bCreateItem = true;
-	Item->OnItemInitOrMove(this, bCreateItem);
+	const bool bCreateItem = Item->OnItemInitOrMove(this);
 
 	if (!bCreateItem)
 	{

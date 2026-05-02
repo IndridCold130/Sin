@@ -11,35 +11,40 @@
 
 void UGameItemBase::Initialize_Implementation()
 {
-	if (DataTable && Owner->Container.Contains(this))
+	if (!DataTable || !Owner || !Owner->Container.Contains(this))
 	{
-		bool CreateItem;
-		OnItemInitOrMove_Implementation(Owner, CreateItem);
-		if(CreateItem)
-		{
-			FItemBase* LocDefaultData = DataTable->FindRow<FItemBase>(ItemID, TEXT("ContextString"), true);
-			if (LocDefaultData)
-			{
-				DefaultData = *LocDefaultData;
-				ItemTags = DefaultData.ItemTags;
-			}
-			Owner->OnSignalItemAdded.Broadcast(Owner, CurrentIndex, this, PreviousIndex, PreviousOwner);
-		}
+		return;
+	}
+
+	const bool bCreateItem = OnItemInitOrMove(Owner);
+
+	if (!bCreateItem)
+	{
+		return;
+	}
+
+	FItemBase* LocDefaultData = DataTable->FindRow<FItemBase>(ItemID, TEXT("ContextString"), true);
+	if (LocDefaultData)
+	{
+		DefaultData = *LocDefaultData;
+		ItemTags = DefaultData.ItemTags;
+		Owner->OnSignalItemAdded.Broadcast(Owner, CurrentIndex, this, PreviousIndex, PreviousOwner);
 	}
 }
 
-void UGameItemBase::OnItemInitOrMove_Implementation(UInventory* DestinationInventory, bool& CreateItem)
+bool UGameItemBase::OnItemInitOrMove_Implementation(UInventory* DestinationInventory)
 {
-	CreateItem = true;
-
+	UE_LOG(LogTemp, Warning, TEXT("OnItemInitOrMove: DestinationInventory=%s Owner=%s"),
+	*GetNameSafe(DestinationInventory),
+	*GetNameSafe(Owner));
 	if (!ItemTags.HasTag(TAG_Item_Currency))
 	{
-		return;
+		return true;
 	}
 
 	if (!DestinationInventory || !DestinationInventory->HasWallet())
 	{
-		return;
+		return true;
 	}
 
 	FGameplayTag LocalCurrencyTag;
@@ -49,17 +54,14 @@ void UGameItemBase::OnItemInitOrMove_Implementation(UInventory* DestinationInven
 
 	if (!bFound || !LocalCurrencyTag.IsValid())
 	{
-		return;
+		return true;
 	}
 
 	FCharStat LocalCurrency;
 	LocalCurrency.Stat = LocalCurrencyTag;
 	LocalCurrency.Value = Stack;
 
-	if (DestinationInventory->StoreCurrency(LocalCurrency))
-	{
-		CreateItem = false;
-	}
+	return !DestinationInventory->StoreCurrency(LocalCurrency);
 }
 
 void UGameItemBase::PostMoved_Implementation()
@@ -221,15 +223,10 @@ void UGameItemBase::HandleDurabilityDamage_Implementation(ASinCharacter* HitChar
 
 bool UGameItemBase::InitGameItemVars(FName ID, FGameplayTagContainer ItemType, UDataTable* Table, int32 Quantity)
 {
+	ItemID = ID;
+	DataTable = Table;
 	ItemTags = ItemType;
 	Stack = FMath::Clamp(Quantity, 1, MaxStack);
-	bool CreateItem;
-	OnItemInitOrMove(Owner, CreateItem);
-	if(CreateItem)
-	{
-		ItemID = ID;
-		DataTable = Table;
-		return true;
-	}
-	return false;
+
+	return OnItemInitOrMove(Owner);
 }

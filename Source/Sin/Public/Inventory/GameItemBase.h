@@ -30,8 +30,8 @@ public:
 		virtual void Initialize_Implementation();
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "GameItem")
-		void OnItemInitOrMove(UInventory* DestinationInventory, bool& CreateItem);
-		virtual void OnItemInitOrMove_Implementation(UInventory* DestinationInventory, bool& CreateItem);
+	bool OnItemInitOrMove(UInventory* DestinationInventory);
+		virtual bool OnItemInitOrMove_Implementation(UInventory* DestinationInventory);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "GameItem")
 		void PostMoved();

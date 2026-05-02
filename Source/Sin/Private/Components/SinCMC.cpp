@@ -12,19 +12,16 @@ USinCMC::USinCMC()
 
 void USinCMC::SetMovementModeFlag(bool Add, EMovementModifier Flag)
 {
-	uint8 LocFlag = static_cast<uint8>(Flag);
 	switch (Flag)
 	{
 	case EMovementModifier::Sprint:
-	{
 		FLAG_Sprint = Add;
-	}
 		break;
+
 	case EMovementModifier::SpellCast:
-	{
 		FLAG_Cast = Add;
-	}
 		break;
+
 	default:
 		break;
 	}
@@ -32,8 +29,12 @@ void USinCMC::SetMovementModeFlag(bool Add, EMovementModifier Flag)
 
 void USinCMC::BeginPlay()
 {
-	GameplayAbilityComponent = GetOwner()->FindComponentByClass<USinASC>();
 	Super::BeginPlay();
+
+	if (AActor* OwnerActor = GetOwner())
+	{
+		GameplayAbilityComponent = OwnerActor->FindComponentByClass<USinASC>();
+	}
 }
 
 void USinCMC::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -44,22 +45,24 @@ void USinCMC::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponen
 
 float USinCMC::MovementSpeedDirectionMod() const
 {
-	FVector ForwardVector = GetOwner()->GetActorForwardVector();
-	FVector MovementDirection = Velocity.GetSafeNormal();
-	// Calculate the alignment (dot product)
-	float Alignment = FVector::DotProduct(ForwardVector, MovementDirection);
-	// Determine movement speed multiplier based on alignment
-	float SpeedMultiplier = 1.0f; // Default speed for forward movement
-	if (Alignment < -0.1f) // Moving backwards
+	const FVector ForwardVector = GetOwner() ? GetOwner()->GetActorForwardVector() : FVector::ForwardVector;
+	const FVector MovementDirection = !Acceleration.IsNearlyZero()
+		? Acceleration.GetSafeNormal()
+		: Velocity.GetSafeNormal();
+
+	const float Alignment = FVector::DotProduct(ForwardVector, MovementDirection);
+
+	if (Alignment < -0.1f)
 	{
 		return 0.6f;
-		//SpeedMultiplier = 0.7f; // 50% slower when moving backwards
 	}
-	else if (Alignment < 0.5f) // Slightly misaligned
+
+	if (Alignment < 0.5f)
 	{
-		SpeedMultiplier = FMath::Lerp(0.6f, 1.0f, Alignment * 2.0f); // Scale between 50% and 100%
+		return FMath::Lerp(0.6f, 1.0f, FMath::Clamp(Alignment * 2.0f, 0.0f, 1.0f));
 	}
-	return SpeedMultiplier;
+
+	return 1.0f;
 }
 
 void USinCMC::UpdateFromCompressedFlags(uint8 Flags)
@@ -85,27 +88,39 @@ FNetworkPredictionData_Client* USinCMC::GetPredictionData_Client() const
 
 float USinCMC::GetMaxSpeed() const
 {
-	float DirectionSpeed = MovementSpeedDirectionMod();
 	float SpeedMod = 1.f;
-	bool Found;
-	GameplayAbilityComponent ? 
-		SpeedMod = GameplayAbilityComponent->GetGameplayAttributeValue(USinAttributeSecondary::GetMovementSpeedAttribute(), Found):
-		SpeedMod = 1.f;
-	float Speed = Super::GetMaxSpeed();
+	bool bFound = false;
+
+	if (GameplayAbilityComponent)
+	{
+		SpeedMod = GameplayAbilityComponent->GetGameplayAttributeValue(
+			USinAttributeSecondary::GetMovementSpeedAttribute(),
+			bFound
+		);
+
+		if (!bFound)
+		{
+			SpeedMod = 1.f;
+		}
+	}
+	float StateMod = 1.f;
+
 	if (FLAG_Sprint)
 	{
-		Speed *= 1.8f * SpeedMod;
+		StateMod *= 1.8f;
 	}
+
 	if (FLAG_Cast)
 	{
-		Speed *= 0.4f* SpeedMod;
+		StateMod *= 0.4f;
 	}
-	return Speed* SpeedMod* DirectionSpeed;
+	return Super::GetMaxSpeed() * SpeedMod * StateMod * MovementSpeedDirectionMod();
 }
 
 void FSinMovementModes::Clear()
 {
 	Super::Clear();
+
 	bSavedWantsToSprint = false;
 	bSavedWantsToCast = false;
 }
@@ -142,26 +157,31 @@ void FSinMovementModes::SetMoveFor(ACharacter* C, float InDeltaTime, FVector con
 void FSinMovementModes::PrepMoveFor(ACharacter* C)
 {
 	Super::PrepMoveFor(C);
+
 	if (C)
 	{
 		if (USinCMC* SinMovement = Cast<USinCMC>(C->GetMovementComponent()))
 		{
 			SinMovement->FLAG_Sprint = bSavedWantsToSprint;
-			SinMovement->FLAG_Cast = bSavedWantsToSprint;
+			SinMovement->FLAG_Cast = bSavedWantsToCast;
 		}
 	}
 }
 
 bool FSinMovementModes::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
 {
-	if (bSavedWantsToSprint != ((FSinMovementModes*)&NewMove)->bSavedWantsToSprint)
+	const FSinMovementModes* NewSinMove = static_cast<const FSinMovementModes*>(NewMove.Get());
+
+	if (bSavedWantsToSprint != NewSinMove->bSavedWantsToSprint)
 	{
 		return false;
 	}
-	if (bSavedWantsToCast != ((FSinMovementModes*)&NewMove)->bSavedWantsToSprint)
+
+	if (bSavedWantsToCast != NewSinMove->bSavedWantsToCast)
 	{
 		return false;
 	}
+
 	return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
 }
 

@@ -18,30 +18,57 @@
 
 void ASinPlayerController::BeginPlay()
 {
-	IA_Subsystem = GetLocalPlayer()->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
-	RegisterInputSettings();
-	OnPossessedPawnChanged.AddDynamic(this, &ThisClass::OnSinPawnReceived);
 	Super::BeginPlay();
+
+	OnPossessedPawnChanged.AddDynamic(this, &ThisClass::OnSinPawnReceived);
+
+	TraceChannel = ECC_GameTraceChannel4;
+
 	if (GetPawn())
 	{
 		OnSinPawnReceived(nullptr, Cast<ASinCharacter>(GetPawn()));
 	}
-	TraceChannel = ECC_GameTraceChannel4;
-	//if (GetNetMode() != NM_DedicatedServer)
-	if (IsLocalController())
-	{
-		GetWorld()->GetTimerManager().SetTimer(InterTimer, this, &ASinPlayerController::CalculateTraceDistance, .1f, true);
-	}
+
 	ASinCharacter* PlayerPawn = Cast<ASinCharacter>(GetPawn());
 	if (PlayerPawn)
 	{
 		PlayerPawn->OnSignalSubstateChanged.AddDynamic(this, &ASinPlayerController::OnSubstateChangedDelegate);
 	}
-	//InputComponent->BindAction(EKeys::AnyKey, IE_Pressed, this, &ASinPlayerController::ProcessPlayerInput);
-	InputComponent->BindAction("AnyKey", IE_Pressed, this, &ASinPlayerController::AnyKey);
-	// Bind axis mappings
-	InputComponent->BindAxis("MouseX", this, &ASinPlayerController::MoveForward);
-	InputComponent->BindAxis("MouseY", this, &ASinPlayerController::MoveRight);
+
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (LocalPlayer)
+	{
+		IA_Subsystem = LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+
+		if (IA_Subsystem)
+		{
+			RegisterInputSettings();
+		}
+	}
+
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().SetTimer(
+			InterTimer,
+			this,
+			&ASinPlayerController::CalculateTraceDistance,
+			0.1f,
+			true
+		);
+	}
+
+	if (InputComponent)
+	{
+		InputComponent->BindAction("AnyKey", IE_Pressed, this, &ASinPlayerController::AnyKey);
+
+		InputComponent->BindAxis("MouseX", this, &ASinPlayerController::MoveForward);
+		InputComponent->BindAxis("MouseY", this, &ASinPlayerController::MoveRight);
+	}
 }
 
 void ASinPlayerController::Tick(float DeltaTime)
