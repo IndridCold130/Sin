@@ -586,14 +586,30 @@ void UInventory::StackItem(UGameItemBase* IncomingItem, UGameItemBase* TargetIte
 
 void UInventory::MoveItemDeux_Implementation(UGameItemBase* Item, int32 DstIndex)
 {
-		if (!Item) { return; }
-		bool CreateItem;
-		Item->OnItemInitOrMove_Implementation(CreateItem);
-		if (!CreateItem) { return; }
-		int32 OldIndex = Item->CurrentIndex;
-		bool Moved;
-		TryAddItem(Item, DstIndex, Moved, OldIndex);
+	if (!Item)
+	{
 		return;
+	}
+
+	bool bCreateItem = true;
+	Item->OnItemInitOrMove_Implementation(bCreateItem);
+
+	const int32 OldIndex = Item->CurrentIndex;
+	UInventory* OldOwner = Item->Owner;
+
+	if (!bCreateItem)
+	{
+		if (OldOwner && OldOwner->Container.IsValidIndex(OldIndex) && OldOwner->Container[OldIndex] == Item)
+		{
+			OldOwner->Container[OldIndex] = nullptr;
+			OldOwner->OnRep_Container();
+		}
+
+		return;
+	}
+
+	bool bMoved = false;
+	TryAddItem(Item, DstIndex, bMoved, OldIndex);
 }
 
 bool UInventory::MoveItemDeux_Validate(UGameItemBase* Item, int32 DstIndex) { return true; }
