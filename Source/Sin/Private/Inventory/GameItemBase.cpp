@@ -30,21 +30,36 @@ void UGameItemBase::Initialize_Implementation()
 
 void UGameItemBase::OnItemInitOrMove_Implementation(bool& CreateItem)
 {
-	if(ItemTags.HasTag(TAG_Item_Currency))
-	{
-		if (Owner->HasWallet())
-		{
-			FCharStat LocalCurrency;
-			FGameplayTag LocalCurrencyTag;
-			bool Found;
-			USinLibrary::GetFirstMatchingGPT(ItemTags, TAG_Item_Currency, false, Found, LocalCurrencyTag);
-			LocalCurrency.Stat = LocalCurrencyTag;
-			LocalCurrency.Value += Stack;
-			Owner->StoreCurrency(LocalCurrency);
-			CreateItem = false;
-		}
-	}
 	CreateItem = true;
+
+	if (!ItemTags.HasTag(TAG_Item_Currency))
+	{
+		return;
+	}
+
+	if (!Owner || !Owner->HasWallet())
+	{
+		return;
+	}
+
+	FGameplayTag LocalCurrencyTag;
+	bool bFound = false;
+
+	USinLibrary::GetFirstMatchingGPT(ItemTags, TAG_Item_Currency, false, bFound, LocalCurrencyTag);
+
+	if (!bFound || !LocalCurrencyTag.IsValid())
+	{
+		return;
+	}
+
+	FCharStat LocalCurrency;
+	LocalCurrency.Stat = LocalCurrencyTag;
+	LocalCurrency.Value = Stack;
+
+	if (Owner->StoreCurrency(LocalCurrency))
+	{
+		CreateItem = false;
+	}
 }
 
 void UGameItemBase::PostMoved_Implementation()
@@ -71,7 +86,7 @@ void UGameItemBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 
 UWorld* UGameItemBase::GetWorld() const
 {
-	// Return pointer to World from object owner, if we don’t work in editor
+	// Return pointer to World from object owner, if we donï¿½t work in editor
 	if (GIsEditor && !GIsPlayInEditorWorld)
 	{
 		return nullptr;

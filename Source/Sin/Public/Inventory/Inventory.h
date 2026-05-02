@@ -147,6 +147,7 @@ public:
 
 	UPROPERTY(SaveGame, ReplicatedUsing = OnRep_Wallet, EditAnywhere, BlueprintReadWrite, Category = "Currency")
 		FCharStats SinWallet;
+	
 		virtual bool HasWallet() override;
 	UPROPERTY(BlueprintAssignable, BlueprintCallable, Category = Inventory)
 		FWalletUpdatedSignature OnWalletUpdated;
@@ -157,6 +158,7 @@ public:
 			this->OnWalletUpdated.Broadcast(SinWallet, DeltaValue);
 		}
 		
+		virtual bool StoreCurrency(FCharStat Currency) override;
 		virtual bool CanAfford(FCharStat BaseCost) override;
 		virtual void GiveMoney_Implementation(FCharStat Currency) override;
 		virtual void AttemptMerchantTransaction_Implementation(UGameItemBase* Item) override;

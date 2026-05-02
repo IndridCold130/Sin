@@ -3,6 +3,7 @@
 
 #include "Inventory/Inventory.h"
 #include "Net/UnrealNetwork.h"
+#include "GAS/SinStatTypes.h"
 #include "Engine/ActorChannel.h"
 
 // Sets default values for this component's properties
@@ -183,6 +184,36 @@ bool UInventory::StoreCurrency(FCharStat Currency)
 	return false;
 }
 
+bool USinInventory::StoreCurrency(FCharStat Currency)
+{
+	if (!HasWallet())
+	{
+		return false;
+	}
+
+	if (!Currency.Stat.IsValid() || Currency.Value <= 0.f)
+	{
+		return false;
+	}
+
+	const FCharStats OldWallet = SinWallet;
+
+	for (FCharStat& WalletCurrency : SinWallet.Attributes)
+	{
+		if (WalletCurrency.Stat == Currency.Stat)
+		{
+			WalletCurrency.Value += Currency.Value;
+			OnRep_Wallet(OldWallet);
+			return true;
+		}
+	}
+
+	SinWallet.Attributes.Add(Currency);
+	OnRep_Wallet(OldWallet);
+
+	return true;
+}
+
 float UInventory::GetInventoryAbsoluteWeight()
 {
 	float localWeight = 0.0f;
@@ -196,18 +227,31 @@ float UInventory::GetInventoryAbsoluteWeight()
 	return localWeight;
 }
 
-void UInventory::CreateItemPRC_Implementation(FName ID, EPrimaryItemType Type,  int32 Quantity, int32 IntendedIndex)
+void UInventory::CreateItemPRC_Implementation(FName ID, EPrimaryItemType Type, int32 Quantity, int32 IntendedIndex)
 {
-	bool Created;
-	UGameItemBase* LocalItem;
-	CreateItem(ID, Type, Quantity, Created, LocalItem);
-		if (Created)
-		{
-			TryAddItem(LocalItem, IntendedIndex, Created);
-		}
+	if (Quantity <= 0)
+	{
+		return;
+	}
+
+	bool bCreated = false;
+	UGameItemBase* LocalItem = nullptr;
+
+	CreateItem(ID, Type, Quantity, bCreated, LocalItem);
+
+	if (!bCreated || !LocalItem)
+	{
+		return;
+	}
+
+	bool bAdded = false;
+	TryAddItem(LocalItem, IntendedIndex, bAdded);
 }
 
-bool UInventory::CreateItemPRC_Validate(FName ID, EPrimaryItemType Type, int32 Quantity, int32 IntendedIndex) { return true; }
+bool UInventory::CreateItemPRC_Validate(FName ID, EPrimaryItemType Type, int32 Quantity, int32 IntendedIndex)
+{
+	return Quantity > 0 && (IntendedIndex == -1 || Container.IsValidIndex(IntendedIndex));
+}
 
 
 bool UInventory::CanAfford(FCharStat BaseCost)
