@@ -14,7 +14,7 @@ void UGameItemBase::Initialize_Implementation()
 	if (DataTable && Owner->Container.Contains(this))
 	{
 		bool CreateItem;
-		OnItemInitOrMove_Implementation(CreateItem);
+		OnItemInitOrMove_Implementation(Owner, CreateItem);
 		if(CreateItem)
 		{
 			FItemBase* LocDefaultData = DataTable->FindRow<FItemBase>(ItemID, TEXT("ContextString"), true);
@@ -28,7 +28,7 @@ void UGameItemBase::Initialize_Implementation()
 	}
 }
 
-void UGameItemBase::OnItemInitOrMove_Implementation(bool& CreateItem)
+void UGameItemBase::OnItemInitOrMove_Implementation(UInventory* DestinationInventory, bool& CreateItem)
 {
 	CreateItem = true;
 
@@ -37,7 +37,7 @@ void UGameItemBase::OnItemInitOrMove_Implementation(bool& CreateItem)
 		return;
 	}
 
-	if (!Owner || !Owner->HasWallet())
+	if (!DestinationInventory || !DestinationInventory->HasWallet())
 	{
 		return;
 	}
@@ -56,7 +56,7 @@ void UGameItemBase::OnItemInitOrMove_Implementation(bool& CreateItem)
 	LocalCurrency.Stat = LocalCurrencyTag;
 	LocalCurrency.Value = Stack;
 
-	if (Owner->StoreCurrency(LocalCurrency))
+	if (DestinationInventory->StoreCurrency(LocalCurrency))
 	{
 		CreateItem = false;
 	}
@@ -224,7 +224,7 @@ bool UGameItemBase::InitGameItemVars(FName ID, FGameplayTagContainer ItemType, U
 	ItemTags = ItemType;
 	Stack = FMath::Clamp(Quantity, 1, MaxStack);
 	bool CreateItem;
-	OnItemInitOrMove(CreateItem);
+	OnItemInitOrMove(Owner, CreateItem);
 	if(CreateItem)
 	{
 		ItemID = ID;
