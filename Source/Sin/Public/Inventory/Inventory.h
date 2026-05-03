@@ -15,6 +15,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FSignaltemShiftedSignature, UInventory*, NewInventory, int32, Index, UGameItemBase*, Item, int32, SrcIndex, UInventory*, SrcInventory);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWalletUpdatedSignature, const FCharStats&, NewValue, const FCharStats&, DeltaValue);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInventoryRefreshedSignature, UInventory*, Inventory);
 
 UCLASS(Blueprintable, ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class SIN_API UInventory : public UActorComponent, public II_Inventory, public IEMSCompSaveInterface
@@ -54,6 +55,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	float GetInventoryAbsoluteWeight();
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 TransferAllTo(UInventory* DestinationInventory);
 
 	UFUNCTION(Server, Reliable, WithValidation, BlueprintCallable, Category = "Inventory")
 		void CreateItemPRC(FName ID, EPrimaryItemType Type, int32 Quantity, int32 Index);

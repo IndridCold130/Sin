@@ -227,6 +227,59 @@ float UInventory::GetInventoryAbsoluteWeight()
 	return localWeight;
 }
 
+int32 UInventory::TransferAllTo(UInventory* DestinationInventory)
+{
+	if (!DestinationInventory || DestinationInventory == this) { return 0;} int32 TransferCount = 0;
+	TArray<UGameItemBase*> ItemsToMove;
+	ItemsToMove.Reserve(Container.Num());
+	for (UGameItemBase* Item : Container)
+	{
+		if (IsValid(Item))
+		{
+			ItemsToMove.Add(Item);
+		}
+	}
+	for (UGameItemBase* Item : ItemsToMove)
+	{
+		if (!IsValid(Item) || Item->Owner != this)
+		{
+			continue;
+		}
+
+		const int32 SourceIndex = Item->CurrentIndex;
+		UInventory* OldOwner = Item->Owner;
+
+		const bool bCreateItem = Item->OnItemInitOrMove(DestinationInventory);
+
+		if (!bCreateItem)
+		{
+			if (OldOwner && OldOwner->Container.IsValidIndex(SourceIndex) && OldOwner->Container[SourceIndex] == Item)
+			{
+				OldOwner->Container[SourceIndex] = nullptr;
+
+				if (OldOwner->GetNetMode() != NM_Client)
+				{
+					OldOwner->HandleClient(false, SourceIndex, Item, SourceIndex, OldOwner);
+				}
+
+				OldOwner->OnRep_Container();
+				++TransferCount;
+			}
+
+			continue;
+		}
+
+		bool bAdded = false;
+		DestinationInventory->TryAddItem(Item, -1, bAdded, SourceIndex);
+
+		if (bAdded)
+		{
+			++TransferCount;
+		}
+	}
+	return TransferCount;
+}
+
 void UInventory::CreateItemPRC_Implementation(FName ID, EPrimaryItemType Type, int32 Quantity, int32 IntendedIndex)
 {
 	if (Quantity <= 0)
@@ -601,6 +654,12 @@ void UInventory::MoveItemDeux_Implementation(UGameItemBase* Item, int32 DstIndex
 		if (OldOwner && OldOwner->Container.IsValidIndex(OldIndex) && OldOwner->Container[OldIndex] == Item)
 		{
 			OldOwner->Container[OldIndex] = nullptr;
+
+			if (OldOwner->GetNetMode() != NM_Client)
+			{
+				OldOwner->HandleClient(false, OldIndex, Item, OldIndex, OldOwner);
+			}
+
 			OldOwner->OnRep_Container();
 		}
 

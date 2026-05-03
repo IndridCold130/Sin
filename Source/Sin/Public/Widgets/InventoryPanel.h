@@ -26,7 +26,7 @@ public:
 		UPROPERTY(BlueprintReadOnly)
 			TObjectPtr<USinHUD> MasterHUD;
 
-		UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = "true"))
+		UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Design", meta = (ExposeOnSpawn = "true"))
 			bool bItemList = false;
 
 		UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Design, meta = (ExposeOnSpawn = "true"))
@@ -40,14 +40,32 @@ public:
 		UPROPERTY(BlueprintReadOnly)
 			TObjectPtr<UInventory>DataHolder;
 
-		UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Design")
 			TSubclassOf<UInventorySlot> InventorySlotClass;
+	
+		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Design")
+			FVector2D SlotSize = FVector2D(80.f, 80.f);
+
+		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Design")
+			FVector2D IconSize = FVector2D(64.f, 64.f);
 
 		UPROPERTY(BlueprintReadOnly)
 			UInventorySlot* CachedSlot;
+	
+		//UFUNCTION(BlueprintCallable, Category = "Inventory|Navigation")
+		//UInventorySlot* NavigateCachedSlot(EInventoryNavigationDirection Direction, bool bWrap = true, bool bSkipEmptySlots = true);
+	
+		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Navigation")
+		int32 NavigationColumns = 1;
 
-		UFUNCTION(BlueprintCallable, Category = "Inventory")
-		virtual void CacheLastHoveredSlot(UInventorySlot* HoveredSlot);
+		UFUNCTION(BlueprintCallable, Category = "Inventory|Navigation")
+		UInventorySlot* NavigateCachedSlot(EInventoryNavigationDirection Direction, bool bWrap = true, bool bSkipEmptySlots = true);
+
+		UFUNCTION(BlueprintCallable, Category = "Inventory|Navigation")
+		UInventorySlot* CycleCachedSlot(bool bRight);
+	
+		UFUNCTION(BlueprintCallable, Category = "Inventory|Navigation")
+		void CacheLastHoveredSlot(UInventorySlot* HoveredSlot);
 
 		UFUNCTION(BlueprintPure, Category = "Inventory")
 		bool HasSpace(FGameplayTag InventoryTag);
@@ -93,7 +111,7 @@ protected:
 	void ManageInventorySlots(int32 Slots, bool bPreview = false);
 	UInventorySlot* FindSlotWidgetByInventoryIndex(int32 InventoryIndex) const;
 	void GetWidgetsOfClassUnderParent(TSubclassOf<UInventorySlot> WidgetClass, TArray<UInventorySlot*>& FoundWidgets);
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Design", meta = (ExposeOnSpawn = true))
 	TSoftObjectPtr<UTexture2D> DefaultPreviewIcon;
 };
 

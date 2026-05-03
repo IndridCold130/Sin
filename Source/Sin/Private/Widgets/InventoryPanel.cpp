@@ -9,6 +9,130 @@
 #include "SinPlayerController.h"
 #include "SinCharacter.h"
 
+UInventorySlot* UInventoryPanel::NavigateCachedSlot(EInventoryNavigationDirection Direction, bool bWrap,
+	bool bSkipEmptySlots)
+{
+	if (!SlotGrid)
+	{
+		return nullptr;
+	}
+
+	const int32 ChildCount = SlotGrid->GetChildrenCount();
+
+	if (ChildCount <= 0)
+	{
+		if (CachedSlot)
+		{
+			CachedSlot->OnHovered(false);
+		}
+
+		CachedSlot = nullptr;
+		return nullptr;
+	}
+
+	TArray<UInventorySlot*> NavigableSlots;
+	NavigableSlots.Reserve(ChildCount);
+
+	for (int32 ChildIndex = 0; ChildIndex < ChildCount; ++ChildIndex)
+	{
+		UInventorySlot* SlotWidget = Cast<UInventorySlot>(SlotGrid->GetChildAt(ChildIndex));
+		if (!SlotWidget)
+		{
+			continue;
+		}
+
+		if (bSkipEmptySlots && !SlotWidget->SlottedItem)
+		{
+			continue;
+		}
+
+		NavigableSlots.Add(SlotWidget);
+	}
+
+	if (NavigableSlots.IsEmpty())
+	{
+		if (CachedSlot)
+		{
+			CachedSlot->OnHovered(false);
+		}
+
+		CachedSlot = nullptr;
+		return nullptr;
+	}
+
+	const int32 CurrentIndex = CachedSlot ? NavigableSlots.Find(CachedSlot) : INDEX_NONE;
+
+	if (CachedSlot)
+	{
+		CachedSlot->OnHovered(false);
+	}
+
+	int32 Delta = 0;
+
+	switch (Direction)
+	{
+	case EInventoryNavigationDirection::Right:
+		Delta = 1;
+		break;
+
+	case EInventoryNavigationDirection::Left:
+		Delta = -1;
+		break;
+
+	case EInventoryNavigationDirection::Down:
+		Delta = FMath::Max(1, NavigationColumns);
+		break;
+
+	case EInventoryNavigationDirection::Up:
+		Delta = -FMath::Max(1, NavigationColumns);
+		break;
+
+	default:
+		Delta = 0;
+		break;
+	}
+
+	int32 NewIndex = 0;
+
+	if (CurrentIndex != INDEX_NONE)
+	{
+		NewIndex = CurrentIndex + Delta;
+
+		if (bWrap)
+		{
+			const int32 Count = NavigableSlots.Num();
+
+			while (NewIndex < 0)
+			{
+				NewIndex += Count;
+			}
+
+			while (NewIndex >= Count)
+			{
+				NewIndex -= Count;
+			}
+		}
+		else
+		{
+			NewIndex = FMath::Clamp(NewIndex, 0, NavigableSlots.Num() - 1);
+		}
+	}
+
+	CachedSlot = NavigableSlots[NewIndex];
+	CachedSlot->OnHovered(true);
+
+	return CachedSlot;
+}
+
+UInventorySlot* UInventoryPanel::CycleCachedSlot(bool bRight)
+{
+	return NavigateCachedSlot(
+		bRight ? EInventoryNavigationDirection::Right : EInventoryNavigationDirection::Left,
+		true,
+		true
+	);
+}
+
 bool UInventoryPanel::HasSpace(FGameplayTag InventoryTag)
 {
 	return DataHolder->HasSpace();
@@ -307,6 +431,7 @@ void UInventoryPanel::ManageInventorySlots(int32 Slots, bool bPreview)
 			LocalSlot->SlotIndex = i;
 			LocalSlot->MasterPanel = this;
 			LocalSlot->SlotType = InventoryType;
+			LocalSlot->ApplyVisualSettings(SlotSize, IconSize);
 			if (!DefaultPreviewIcon.IsNull()&& LocalSlot->PreviewIconOverride.IsNull())
 			{
 				LocalSlot->PreviewIconOverride = DefaultPreviewIcon;

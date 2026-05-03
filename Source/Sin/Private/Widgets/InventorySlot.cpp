@@ -79,6 +79,21 @@ TSoftObjectPtr<UTexture2D> UInventorySlot::GetDefaultPreviewIcon()
 	return nullptr;
 }
 
+void UInventorySlot::ApplyVisualSettings(FVector2D InSlotSize, FVector2D InIconSize)
+{
+	if (SlotSizeBox)
+	{
+		SlotSizeBox->SetWidthOverride(InSlotSize.X);
+		SlotSizeBox->SetHeightOverride(InSlotSize.Y);
+	}
+
+	if (IconSizeBox)
+	{
+		IconSizeBox->SetWidthOverride(InIconSize.X);
+		IconSizeBox->SetHeightOverride(InIconSize.Y);
+	}
+}
+
 void UInventorySlot::RefreshSlot_Implementation(UGameItemBase* Item)
 {
 	SlottedItem = Item;

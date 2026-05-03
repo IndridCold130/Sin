@@ -7,6 +7,7 @@
 #include "Widgets/InventoryPanel.h"
 #include "Animation/WidgetAnimation.h"
 #include "Components/Border.h"
+#include "Components/SizeBox.h"
 #include "Widgets/InvSlotVisual.h"
 #include "Inventory/GameItemBase.h"
 #include "InventorySlot.generated.h"
@@ -31,6 +32,12 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
 		UBorder* IconBorder;
+	
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+		USizeBox* SlotSizeBox;
+
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+		USizeBox* IconSizeBox;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true))
 		int32 SlotIndex;
@@ -52,7 +59,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true))
 		UInventoryPanel* MasterPanel;
-
+	
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Design")
+		void ApplyVisualSettings(FVector2D InSlotSize, FVector2D InIconSize);
+	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Inventory")
 		void RefreshSlot(UGameItemBase* Item);
 		virtual void RefreshSlot_Implementation(UGameItemBase* Item);

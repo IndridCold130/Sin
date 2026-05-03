@@ -242,4 +242,13 @@ struct FSinWeapon : public FEquipmentItem
 	TSoftObjectPtr<USoundBase> SoundSheatheWeapon;
 };
 
+UENUM(BlueprintType)
+enum class EInventoryNavigationDirection : uint8
+{
+	Right UMETA(DisplayName = "Right"),
+	Left UMETA(DisplayName = "Left"),
+	Up UMETA(DisplayName = "Up"),
+	Down UMETA(DisplayName = "Down")
+};
+
 #undef LOCTEXT_NAMESPACE
