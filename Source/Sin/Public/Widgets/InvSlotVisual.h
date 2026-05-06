@@ -7,6 +7,7 @@
 #include "InvSlotVisual.generated.h"
 
 class UImage;
+class USizeBox;
 /**
  * 
  */
@@ -18,7 +19,10 @@ class SIN_API UInvSlotVisual : public UUserWidget
 public:
 
 	virtual void NativeConstruct() override;
-
+	
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+		USizeBox* IconBox;
+	
 	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
 		UImage* Icon;
 

@@ -105,6 +105,56 @@ void USinHUD::LoadSinMenu_Implementation(ASinPlayerController* SinPlayer, FGamep
 		LoadMenu(ActiveMenuName, FStreamableDelegate::CreateUObject(this, &USinHUD::OnMenuLoaded, SinPlayer, ActiveMenuName, Interactable, MenuTag), bAsync);
 }
 
+bool USinHUD::IsMenuLoaded(FGameplayTag MenuTag, bool bRequireActive) const
+{
+	if (!MenuTag.IsValid())
+	{
+		return false;
+	}
+
+	if (bLoadingMenu)
+	{
+		return false;
+	}
+
+	if (!MenuTagMap.Contains(MenuTag))
+	{
+		return false;
+	}
+
+	if (bRequireActive && ActiveMenu != MenuTag)
+	{
+		return false;
+	}
+
+	if (!SpecialBorder || !SpecialBorder->HasAnyChildren())
+	{
+		if (!InteractionBorder || !InteractionBorder->HasAnyChildren())
+		{
+			return false;
+		}
+	}
+
+	const FName ExpectedMenuName = MenuTagMap[MenuTag];
+
+	if (ActiveMenuName != ExpectedMenuName)
+	{
+		return false;
+	}
+
+	const bool bInSpecialBorder =
+	SpecialBorder &&
+	SpecialBorder->HasAnyChildren() &&
+	Cast<USinMenuBase>(SpecialBorder->GetChildAt(0));
+
+	const bool bInInteractionBorder =
+		InteractionBorder &&
+		InteractionBorder->HasAnyChildren() &&
+		Cast<USinMenuBase>(InteractionBorder->GetChildAt(0));
+
+	return bInSpecialBorder || bInInteractionBorder;
+}
+
 void USinHUD::OnMenuLoaded(ASinPlayerController* SinPlayer, FName Menu, AActor* Interactable, FGameplayTag MenuTag)
 {
 	FPrimaryAssetId AssetId(FPrimaryAssetType(TEXT("UI")), Menu);

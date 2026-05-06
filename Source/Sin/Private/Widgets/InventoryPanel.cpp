@@ -204,6 +204,8 @@ void UInventoryPanel::ItemAdded(UInventory* NewInventory, int32 Index, UGameItem
 		float EquipWeight = 0.0f;
 		InventoryParent->RecalculateWeight(DataHolder, Weight, EquipWeight);
 	}
+	BP_OnInventoryRefreshed(NewInventory);
+	BP_OnInventoryRefreshed(SrcInventory);
 }
 
 void UInventoryPanel::ItemRemoved(UInventory* NewInventory, int32 Index, UGameItemBase* Item, int32 SrcIndex, UInventory* SrcInventory)
@@ -229,6 +231,8 @@ void UInventoryPanel::ItemRemoved(UInventory* NewInventory, int32 Index, UGameIt
 		float EquipWeight = 0.0f;
 		InventoryParent->RecalculateWeight(DataHolder, Weight, EquipWeight);
 	}
+	BP_OnInventoryRefreshed(NewInventory);
+	BP_OnInventoryRefreshed(SrcInventory);
 }
 
 bool UInventoryPanel::OnDoubleClickedSlot(FGameplayTag SlotType, int32 SlotIndex)
@@ -358,6 +362,7 @@ void UInventoryPanel::NativeDestruct()
 	{
 		DataHolder->OnSignalItemAdded.RemoveDynamic(this, &UInventoryPanel::ItemAdded);
 		DataHolder->OnSignalItemRemoved.RemoveDynamic(this, &UInventoryPanel::ItemRemoved);
+		DataHolder->OnInventoryRefreshed.RemoveDynamic(this, &UInventoryPanel::HandleInventoryRefreshed);
 	}
 }
 
@@ -387,6 +392,10 @@ void UInventoryPanel::SetInventoryData(AActor* Owner)
 			{
 				DataHolder->OnSignalItemRemoved.AddDynamic(this, &UInventoryPanel::ItemRemoved);
 			}
+			if (!DataHolder->OnInventoryRefreshed.IsAlreadyBound(this, &UInventoryPanel::HandleInventoryRefreshed))
+			{
+				DataHolder->OnInventoryRefreshed.AddDynamic(this, &UInventoryPanel::HandleInventoryRefreshed);
+			}
 			ASinCharacter* Character = Cast<ASinCharacter>(Owner);
 			if (Character)
 			{
@@ -401,6 +410,17 @@ void UInventoryPanel::SetInventoryData(AActor* Owner)
 			return;
 		};
 	}	
+}
+
+void UInventoryPanel::HandleInventoryRefreshed(UInventory* RefreshedInventory)
+{
+	if (RefreshedInventory != DataHolder)
+	{
+		return;
+	}
+
+	ManageInventorySlots(DataHolder ? DataHolder->InventorySize : 0);
+	BP_OnInventoryRefreshed(RefreshedInventory);
 }
 
 void UInventoryPanel::ManageInventorySlots(int32 Slots, bool bPreview)

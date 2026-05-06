@@ -15,6 +15,13 @@
 #include "GameFramework/InputSettings.h"
 //#include "AbilitySystemBlueprintLibrary.h"
 #include "GAS/SinASC.h"
+#include "Inventory/InventoryRPC.h"
+
+
+ASinPlayerController::ASinPlayerController()
+{
+	InventoryRPC = CreateDefaultSubobject<USinInventoryRPC>(TEXT("InventoryRPC"));
+}
 
 void ASinPlayerController::BeginPlay()
 {
@@ -333,6 +340,11 @@ void ASinPlayerController::NewPawnPossessed_Implementation(const ASinCharacter* 
 void ASinPlayerController::LoadSinMenu_Implementation(FGameplayTag SubmenuTag, AActor* Interactable, bool bAsync)
 {
 	if (MainHUD) { MainHUD->LoadSinMenu_Implementation(this, SubmenuTag, Interactable, bAsync); }
+}
+
+bool ASinPlayerController::IsSinMenuLoaded(FGameplayTag MenuTag, bool bRequireActive) const
+{
+	return MainHUD && MainHUD->IsMenuLoaded(MenuTag, bRequireActive);
 }
 
 void ASinPlayerController::AnyKey(FKey Key)

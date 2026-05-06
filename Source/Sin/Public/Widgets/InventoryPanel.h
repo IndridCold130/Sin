@@ -69,6 +69,15 @@ public:
 
 		UFUNCTION(BlueprintPure, Category = "Inventory")
 		bool HasSpace(FGameplayTag InventoryTag);
+		
+		UFUNCTION(Category = "Inventory")
+		void HandleInventoryRefreshed(UInventory* RefreshedInventory);
+	
+		//UFUNCTION(BlueprintImplementableEvent, Category="Inventory")
+		//void BP_OnInventoryRefreshed(UInventory* RefreshedInventory);
+	
+		UFUNCTION(BlueprintImplementableEvent, Category="Inventory")
+		void BP_OnInventoryRefreshed(UInventory* RefreshedInventory);
 
 		TMap<FGameplayTag, TArray<UInventorySlot*>> InvSlotData;
 		TArray<UInventorySlot* > SlotData;

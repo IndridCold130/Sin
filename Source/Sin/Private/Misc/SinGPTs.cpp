@@ -73,6 +73,8 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Undergarments_Panties, "Item.Equipment
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Undergarments_Top, "Item.Equipment.Undergarments.Top");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Undergarments_Hosiery, "Item.Equipment.Undergarments.Hosiery");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Utility, "Item.Equipment.Utility");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Quest, "Item.Quest");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Craft, "Item.Craft");
 // ATTRIBUTES REDUX
 UE_DEFINE_GAMEPLAY_TAG(TAG_ComboModifier, "ComboModifier");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Mult, "Mult");

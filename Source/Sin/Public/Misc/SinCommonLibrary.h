@@ -17,6 +17,9 @@
 
 #include "SinCommonLibrary.generated.h"
 
+class APlayerController;
+class UInputAction;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnAttributeChanged, FGameplayAttribute, Attribute, float, NewValue, float, OldValue);
 /**
  * 
@@ -75,6 +78,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	static URichTextBlock* AddStyledRichTextBlock(UPanelWidget* Panel, UDataTable* TextStyleSet, const FString Style, const FText& InText, EHorizontalAlignment Alignment = HAlign_Left);
+	
+	UFUNCTION(BlueprintPure, Category="Input|Display")
+	static FText GetKeyDisplayTextForInputAction(
+		APlayerController* PlayerController,
+		const UInputAction* InputAction,
+		bool bGamepadMode
+	);
 };
 
 // last working static TSubclassOf<UObject> SinLoadClassQuatre(FLatentActionInfo LatentInfo, UClass* Asset, EAssetLoadedOp& Completed);

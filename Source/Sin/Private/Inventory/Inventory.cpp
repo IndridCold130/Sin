@@ -2,6 +2,12 @@
 
 
 #include "Inventory/Inventory.h"
+
+#include "Inventory/SinInventoryContainerTypes.h"
+#include "Inventory/SinInventoryEntryTypes.h"
+#include "Inventory/Items/SinItemDefinition.h"
+#include "Inventory/Items/SinItemFragment.h"
+#include "Inventory/SinInventoryContainerTypes.h"
 #include "Net/UnrealNetwork.h"
 #include "GAS/SinStatTypes.h"
 #include "Engine/ActorChannel.h"
@@ -277,6 +283,8 @@ int32 UInventory::TransferAllTo(UInventory* DestinationInventory)
 			++TransferCount;
 		}
 	}
+	NotifyInventoryChanged(); // source
+	DestinationInventory->NotifyInventoryChanged(); // destination
 	return TransferCount;
 }
 
@@ -701,6 +709,182 @@ void UInventory::HasItemAtIndex(int32 Index, bool& HasItem, UGameItemBase*& Item
 	return;
 }
 
+bool UInventory::CreateInventoryEntry(USinItemDefinition* ItemDefinition, FSinInventoryEntry& OutEntry, int32 StackCount) const
+{
+	if (!ItemDefinition || StackCount <= 0)
+	{
+		return false;
+	}
+
+	OutEntry = FSinInventoryEntry();
+	OutEntry.EntryId = FGuid::NewGuid();
+	OutEntry.ItemDefinition = ItemDefinition;
+	OutEntry.StackCount = StackCount;
+	OutEntry.ContainerTag = FGameplayTag();
+	OutEntry.SlotIndex = INDEX_NONE;
+
+	return true;
+}
+
+bool UInventory::AddItemToInventory(USinItemDefinition* ItemDefinition, int32 StackCount)
+{
+	FSinInventoryEntry NewEntry;
+	if (!CreateInventoryEntry(ItemDefinition, NewEntry, StackCount))
+	{
+		return false;
+	}
+
+	FGameplayTag TargetContainer;
+	if (!FindBestContainerForItem(ItemDefinition, TargetContainer))
+	{
+		return false;
+	}
+
+	return AddEntryToContainer(NewEntry, TargetContainer);
+}
+
+bool UInventory::DoesContainerAcceptItem(FGameplayTag ContainerTag, USinItemDefinition* ItemDefinition) const
+{
+	if (!ItemDefinition){return false;}
+
+	const FSinInventoryContainerState* Subinventory = FindContainerState(ContainerTag);
+	if (!Subinventory)
+	{
+		return false;
+	}
+	return Subinventory->AcceptsItemTags(ItemDefinition->ItemTags);
+}
+
+bool UInventory::IsContainerFull(FGameplayTag ContainerTag) const
+{
+	const FSinInventoryContainerState* Subinventory = FindContainerState(ContainerTag);
+	if (!Subinventory)
+	{
+		return true; // treat invalid container as "full"
+	}
+	if (Subinventory->bBottomless){return false;}
+	
+	int32 ItemCount = 0;
+	for (const FSinInventoryEntry& Entry : ItemInventory)
+	{
+		if (Entry.ContainerTag == ContainerTag)
+		{
+			ItemCount++;
+		}
+	}
+	return ItemCount >= Subinventory->SlotCount;
+}
+
+bool UInventory::FindFirstFreeSlotV2(FGameplayTag ContainerTag, int32& OutSlotIndex) const
+{
+	OutSlotIndex = INDEX_NONE;
+	const FSinInventoryContainerState* Subinventory = FindContainerState(ContainerTag);
+	if (!Subinventory)
+	{
+		return false;
+	}
+	if (Subinventory->bBottomless)
+	{
+		// For bottomless/list containers, append at the end.
+		int32 MaxUsedIndex = INDEX_NONE;
+
+		for (const FSinInventoryEntry& Entry : ItemInventory)
+		{
+			if (Entry.ContainerTag == ContainerTag)
+			{
+				MaxUsedIndex = FMath::Max(MaxUsedIndex, Entry.SlotIndex);
+			}
+		}
+
+		OutSlotIndex = MaxUsedIndex + 1;
+		return true;
+	}
+	for (int32 SlotIndex = 0; SlotIndex < Subinventory->SlotCount; ++SlotIndex)
+	{
+		bool bOccupied = false;
+
+		for (const FSinInventoryEntry& Entry : ItemInventory)
+		{
+			if (Entry.ContainerTag == ContainerTag && Entry.SlotIndex == SlotIndex)
+			{
+				bOccupied = true;
+				break;
+			}
+		}
+
+		if (!bOccupied)
+		{
+			OutSlotIndex = SlotIndex;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UInventory::FindBestContainerForItem(USinItemDefinition* ItemDefinition, FGameplayTag& OutContainerTag) const
+{
+	OutContainerTag = FGameplayTag();
+
+	if (!ItemDefinition)
+	{
+		return false;
+	}
+
+	const FSinInventoryContainerState* BestContainer = nullptr;
+
+	for (const FSinInventoryContainerState& Subinventory : Containers)
+	{
+		if (!Subinventory.ContainerTag.IsValid())
+		{
+			continue;
+		}
+
+		if (!DoesContainerAcceptItem(Subinventory.ContainerTag, ItemDefinition))
+		{
+			continue;
+		}
+
+		if (IsContainerFull(Subinventory.ContainerTag))
+		{
+			continue;
+		}
+
+		if (!BestContainer || Subinventory.SortPriority < BestContainer->SortPriority)
+		{
+			BestContainer = &Subinventory;
+		}
+	}
+
+	if (!BestContainer)
+	{
+		return false;
+	}
+	OutContainerTag = BestContainer->ContainerTag;
+	return true;
+}
+
+const FSinInventoryContainerState* UInventory::FindContainerState(FGameplayTag ContainerTag) const
+{
+	for (const FSinInventoryContainerState& Subinventory : Containers)
+	{
+		if (Subinventory.ContainerTag == ContainerTag)
+		{
+			return &Subinventory; // pointer to element inside array
+		}
+	}
+	return nullptr; // not found
+}
+
+bool UInventory::AddEntryToContainer(const FSinInventoryEntry& Entry, FGameplayTag PreferredContainerTag)
+{
+	return false;
+}
+
+void UInventory::NotifyInventoryChanged()
+{
+	OnInventoryRefreshed.Broadcast(this);
+}
+
 void UInventory::HandleClient_Implementation(bool Added, int32 NewIndex, UGameItemBase* Item, int32 OldIndex, UInventory* SrcInventory)
 {
 	if (Added)
@@ -719,6 +903,7 @@ void UInventory::HandleClient_Implementation(bool Added, int32 NewIndex, UGameIt
 
 void UInventory::OnRep_Container()
 {
+	OnInventoryRefreshed.Broadcast(this);
 }
 
 // Called when the game starts

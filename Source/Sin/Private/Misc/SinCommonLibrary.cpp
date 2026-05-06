@@ -2,10 +2,16 @@
 
 
 #include "Misc/SinCommonLibrary.h"
+
 #include "Engine/AssetManager.h"
 #include "Components/VerticalBoxSlot.h"
-
 #include "GAS/SinAttributeProgression.h"
+#include "GameFramework/PlayerController.h"
+#include "Engine/LocalPlayer.h"
+#include "EnhancedInputSubsystems.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
+//#include "EnhancedPlayerMappableKeyProfile.h"
+#include "InputAction.h"
 
 void USinCommonLibrary::GetAllMetaData(const UAnimSequenceBase* AnimationSequence, TArray<UAnimMetaData*>& MetaData)
 {
@@ -297,6 +303,75 @@ URichTextBlock* USinCommonLibrary::AddStyledRichTextBlock(UPanelWidget* Panel, U
 		VBSlot->SetHorizontalAlignment(Alignment);
 	}
 	return RichText;
+}
+
+FText USinCommonLibrary::GetKeyDisplayTextForInputAction(APlayerController* PlayerController,
+	const UInputAction* InputAction, bool bGamepadMode)
+{
+	if (!PlayerController || !InputAction)
+	{
+		return FText::GetEmpty();
+	}
+
+	ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer();
+	if (!LocalPlayer)
+	{
+		return FText::GetEmpty();
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+
+	if (!Subsystem)
+	{
+		return FText::GetEmpty();
+	}
+
+	UEnhancedInputUserSettings* Settings = Subsystem->GetUserSettings();
+	if (!Settings)
+	{
+		return FText::GetEmpty();
+	}
+
+	UEnhancedPlayerMappableKeyProfile* Profile = Settings->GetCurrentKeyProfile();
+	if (!Profile)
+	{
+		return FText::GetEmpty();
+	}
+
+	const TMap<FName, FKeyMappingRow>& Rows = Profile->GetPlayerMappingRows();
+
+	for (const TPair<FName, FKeyMappingRow>& RowPair : Rows)
+	{
+		const FKeyMappingRow& Row = RowPair.Value;
+
+		for (const FPlayerKeyMapping& Mapping : Row.Mappings)
+		{
+			if (Mapping.GetMappingName() == InputAction->GetFName())
+			{
+				const FKey Key = Mapping.GetCurrentKey();
+
+				if (bGamepadMode != Key.IsGamepadKey())
+				{
+					continue;
+				}
+
+				return Key.GetDisplayName(false);
+			}
+		}
+	}
+	// 2. Fallback: currently active mapping contexts
+	const TArray<FKey> RuntimeKeys = Subsystem->QueryKeysMappedToAction(InputAction);
+
+	for (const FKey& Key : RuntimeKeys)
+	{
+		if (Key.IsGamepadKey() == bGamepadMode)
+		{
+			return Key.GetDisplayName(false);
+		}
+	}
+	
+	return FText::GetEmpty();
 }
 
 UAsyncWidgetLoader* UAsyncWidgetLoader::AsyncLoadWidgetClass(TSoftClassPtr<UUserWidget> SoftWidgetClass)

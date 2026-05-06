@@ -7,15 +7,42 @@
 #include "Inventory/GameItemBase.h"
 #include "Inventory/GameItemEquipment.h"
 #include "Inventory/GameItemWeapon.h"
+#include "Inventory/Items/SinItemFragment_Inventory.h"
 #include "SinGlobalStructs.h"
 #include "Misc/SinGPTs.h"
 #include "Interfaces/I_Inventory.h"
 #include "EMSCompSaveInterface.h"
 #include "Inventory.generated.h"
 
+struct FSinInventoryEntry;
+struct FSinInventoryContainerState;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FSignaltemShiftedSignature, UInventory*, NewInventory, int32, Index, UGameItemBase*, Item, int32, SrcIndex, UInventory*, SrcInventory);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWalletUpdatedSignature, const FCharStats&, NewValue, const FCharStats&, DeltaValue);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInventoryRefreshedSignature, UInventory*, Inventory);
+
+// NEW INVENTORY SYSTEM
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnSinInventoryContainerChanged,
+	UInventory*, Inventory,
+	FGameplayTag, ContainerTag
+);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnSinInventoryEntryAdded,
+	UInventory*, Inventory,
+	const FSinInventoryEntry&, Entry
+);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnSinInventoryEntryRemoved,
+	UInventory*, Inventory,
+	const FGuid&, EntryId
+);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnSinInventoryEntryChanged,
+	UInventory*, Inventory,
+	const FSinInventoryEntry&, Entry
+);
+// NEW INVENTORY SYSTEM
 
 UCLASS(Blueprintable, ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class SIN_API UInventory : public UActorComponent, public II_Inventory, public IEMSCompSaveInterface
@@ -92,6 +119,31 @@ public:
 		void HasItemAtIndex(int32 Index, bool& HasItem, UGameItemBase*& Item);
 	UFUNCTION(NetMulticast, Reliable, BlueprintCallable, Category = "Inventory")
 		virtual void HandleClient(bool Added, int32 NewIndex, UGameItemBase* Item,int32 OldIndex, UInventory* SrcInventory);
+	
+	//NEW SYSTEM
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	bool CreateInventoryEntry(USinItemDefinition* ItemDefinition, FSinInventoryEntry& OutEntry, int32 StackCount = 1) const;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	bool AddItemToInventory(USinItemDefinition* ItemDefinition, int32 StackCount = 1);
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	bool DoesContainerAcceptItem(FGameplayTag ContainerTag, USinItemDefinition* ItemDefinition) const;
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	bool IsContainerFull(FGameplayTag ContainerTag) const;
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	bool FindFirstFreeSlotV2(FGameplayTag ContainerTag, int32& OutSlotIndex) const;
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	bool FindBestContainerForItem(USinItemDefinition* ItemDefinition, FGameplayTag& OutContainerTag) const;
+	
+	const FSinInventoryContainerState* FindContainerState(FGameplayTag ContainerTag) const;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	bool AddEntryToContainer(const FSinInventoryEntry& Entry, FGameplayTag PreferredContainerTag);
+	//NEW SYSTEM
 
 	// DELEGATES
 
@@ -100,6 +152,26 @@ public:
 
 	UPROPERTY(BlueprintAssignable, BlueprintCallable, Category = Inventory)
 		FSignaltemShiftedSignature OnSignalItemRemoved;
+	
+	UPROPERTY(BlueprintAssignable, Category="Inventory")
+		FInventoryRefreshedSignature OnInventoryRefreshed;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory")
+		void NotifyInventoryChanged();
+	
+	// NEW SYSTEM
+	UPROPERTY(BlueprintAssignable, Category="Inventory|New")
+	FOnSinInventoryContainerChanged OnContainerChanged;
+
+	UPROPERTY(BlueprintAssignable, Category="Inventory|New")
+	FOnSinInventoryEntryAdded OnInventoryEntryAdded;
+
+	UPROPERTY(BlueprintAssignable, Category="Inventory|New")
+	FOnSinInventoryEntryRemoved OnInventoryEntryRemoved;
+
+	UPROPERTY(BlueprintAssignable, Category="Inventory|New")
+	FOnSinInventoryEntryChanged OnInventoryEntryChanged;
+	// NEW SYSTEM
 
 	// CORE VARS
 
@@ -122,7 +194,13 @@ public:
 
 	UFUNCTION()
 		void OnRep_Container();
-
+	
+	// NEW INVENTORY SYSTEM
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory|Containers")
+		TArray<FSinInventoryContainerState> Containers;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory|Entries")
+		TArray<FSinInventoryEntry> ItemInventory;
+	// NEW INVENTORY SYSTEM
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;

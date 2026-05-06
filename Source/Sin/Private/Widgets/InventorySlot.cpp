@@ -56,7 +56,7 @@ void UInventorySlot::NativeOnDragDetected(const FGeometry& MyGeometry, const FPo
 		{
 			UDragDropOperation* Drag = NewObject<UDragDropOperation>();
 			Drag->Payload = this;
-			//SlotImg->SetClipping(EClippin);
+			//SlotImg->SetClipping(EClipping);
 			Drag->DefaultDragVisual = SlotImg;
 			Drag->Pivot = EDragPivot::CenterCenter;
 			Operation = Drag;
@@ -91,6 +91,11 @@ void UInventorySlot::ApplyVisualSettings(FVector2D InSlotSize, FVector2D InIconS
 	{
 		IconSizeBox->SetWidthOverride(InIconSize.X);
 		IconSizeBox->SetHeightOverride(InIconSize.Y);
+	}
+	if (SlotImg)
+	{
+		SlotImg->IconBox->SetWidthOverride(InIconSize.X);
+		SlotImg->IconBox->SetHeightOverride(InIconSize.Y);
 	}
 }
 

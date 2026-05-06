@@ -14,6 +14,7 @@
 class ASinCharacter;
 class USinInputConfig;
 class USinASC;
+class USinInventoryRPC;
 struct FInputActionValue;
 struct FInputActionInstance;
 
@@ -29,6 +30,10 @@ class SIN_API ASinPlayerController : public APlayerController, public ISinPlayer
 
 public:
 
+	ASinPlayerController();
+	
+	UFUNCTION(BlueprintPure, Category="Inventory")
+	USinInventoryRPC* GetInventoryRPC() const { return InventoryRPC; }
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TArray<TObjectPtr<UInputMappingContext>> MappingsToRegister;
 
@@ -120,6 +125,8 @@ protected:
 
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		//TSubclassOf<USinHUD> HUD_Subclass;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory", meta=(AllowPrivateAccess="true"))
+		TObjectPtr<USinInventoryRPC> InventoryRPC;
 
 public:
 
@@ -138,6 +145,7 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Input")
 		void SinInputMode(UUserWidget* Focus, EInputMode InputMode);
 		virtual void SinInputMode_Implementation(UUserWidget* Focus, EInputMode InputMode);
+	
 	UPROPERTY(BlueprintReadOnly)
 		EInputMode CurrentInputMode;
 
@@ -148,6 +156,9 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "UI")
 		void LoadSinMenu(FGameplayTag SubmenuTag, AActor* Interactable, bool bAsync);
 		virtual void LoadSinMenu_Implementation(FGameplayTag SubmenuTag, AActor* Interactable, bool bAsync = false);
+	
+	UFUNCTION(BlueprintPure, Category="Sin|Menu")
+		bool IsSinMenuLoaded(FGameplayTag MenuTag, bool bRequireActive = true) const;
 
 private:
 	bool bIsUsingGamepad = false; // Tracks the current input device

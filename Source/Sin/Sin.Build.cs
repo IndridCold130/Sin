@@ -13,7 +13,8 @@ public class Sin : ModuleRules
 		"GameplayAbilities", 
 		"GameplayTasks",
 		"EnhancedInput",
-		"AnimGraphRuntime"
+		"AnimGraphRuntime",
+		"Niagara"
         });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "GameplayTags" });

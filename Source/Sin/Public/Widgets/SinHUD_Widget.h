@@ -128,6 +128,9 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Carousel")
 		void LoadSinMenu(ASinPlayerController* SinPlayer, FGameplayTag SubmenuTag, AActor* Interactable, bool bAsync);
 		virtual void LoadSinMenu_Implementation(ASinPlayerController* SinPlayer, FGameplayTag SubmenuTag, AActor* Interactable, bool bAsync = false);
+	
+	UFUNCTION(BlueprintPure, Category="Sin|Menu")
+		bool IsMenuLoaded(FGameplayTag MenuTag, bool bRequireActive = true) const;
 
 		UFUNCTION(Category = "Carousel")
 		void OnMenuLoaded(ASinPlayerController* SinPlayer, FName Menu, AActor* Interactable = nullptr, FGameplayTag MenuTag = TAG_Menu_Carousel_Character);
