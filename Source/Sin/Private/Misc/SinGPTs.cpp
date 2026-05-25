@@ -55,6 +55,7 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Substate_Hold_RightHandStyle, "Substate.RightHandStyl
 // ITEM GAMEPLAYTAGS
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item, "Item");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Currency, "Item.Currency");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Currency_Crown, "Item.Currency.Crown");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment, "Item.Equipment");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Weapon, "Item.Equipment.Weapon");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Weapon_MainHand, "Item.Equipment.Weapon.MainHand");
@@ -104,7 +105,7 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Block_Cold, "Block.Cold");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Block_Lightning, "Block.Lightning");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Block_Arcane, "Block.Arcane");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Block_Dark, "Block.Dark");
-UE_DEFINE_GAMEPLAY_TAG(TAG_Block_Holy, ".Block.Holy");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Block_Holy, "Block.Holy");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Source_Aura, "Source.Aura");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Source_Buff, "Source.Buff");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Source_Curse, "Source.Curse");
@@ -241,6 +242,8 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Attribute_Progression_UnspentAttributePoints, "Attrib
 // Material Types
 
 UE_DEFINE_GAMEPLAY_TAG(TAG_Material, "Material");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Material_Bone, "Material.Bone");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Material_Leather, "Material.Leather");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Material_Metal, "Material.Metal");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Material_Mineral, "Material.Mineral");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Material_Wood, "Material.Wood");

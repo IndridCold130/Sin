@@ -12,6 +12,7 @@
 
 class UInventory;
 class UInventorySlot;
+class USinItemContextMenu;
 
 /**
  * 
@@ -110,7 +111,7 @@ public:
 		virtual void NativeConstruct() override;
 		virtual void NativeDestruct() override;
 
-		UFUNCTION(BlueprintCallable, Category = "Inventory")
+		UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Inventory")
 			void SetInventoryData(AActor* Owner);
 
 protected:
@@ -122,6 +123,53 @@ protected:
 	void GetWidgetsOfClassUnderParent(TSubclassOf<UInventorySlot> WidgetClass, TArray<UInventorySlot*>& FoundWidgets);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Design", meta = (ExposeOnSpawn = true))
 	TSoftObjectPtr<UTexture2D> DefaultPreviewIcon;
+
+	// NEW SYSTEM
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory|New")
+	bool bUseNewInventorySystem = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory|New")
+	FGameplayTag DisplayedContainerTag;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	void ManageInventorySlotsV2(const FGuid& ContainerId);
+	
+	UFUNCTION()
+	void HandleContainerChanged(UInventory* Inventory, FGuid ContainerId);
+	
+	UPROPERTY(meta=(BindWidget))
+	TObjectPtr<UPanelWidget> ContainerButtonBox;
+
+	UPROPERTY(EditDefaultsOnly, Category="Inventory|New")
+	TSubclassOf<UUserWidget> ContainerButtonClass;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	void SetDisplayedContainer(const FGuid& NewContainerId);
+	
+	UPROPERTY(BlueprintReadOnly, Category="Inventory|New")
+	FGuid DisplayedContainerId;
+
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	void RebuildContainerButtons();
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	void UpdateContainerButtonStates();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory|Context Menu")
+	TSubclassOf<USinItemContextMenu> ContextMenuClass;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|Context Menu")
+	bool TryShowItemContextMenuFromSlot(UInventorySlot* SourceSlot);
+	
+	UPROPERTY()
+	TObjectPtr<USinItemContextMenu> ActiveContextMenu;
+
+	void ShowItemContextMenu(UInventorySlot* SourceSlot);
+	
+	void HideItemContextMenu();
+	// NEW
+	
 };
 
 
@@ -138,20 +186,5 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UInventory* MerchantInventory;
-};
-
-/**
- *
- */
-UCLASS()
-class SIN_API UPlayerInventoryView : public UUserWidget
-{
-	GENERATED_BODY()
-
-public:
-
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Inventory")
-	void RecalculateWeight(UInventory* Holder, float& BackpackWeight, float& EquipLoad);
-	virtual void RecalculateWeight_Implementation(UInventory* Holder, float& BackpackWeight, float& EquipLoad);
 };
 	

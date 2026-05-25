@@ -26,9 +26,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
 		UImage* Icon;
 
-	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	//void SetItemIconImage(TSoftObjectPtr<UTexture2D> SoftImg);
-	virtual void SetItemIconImage_Implementation(TSoftObjectPtr<UTexture2D> SoftImg);
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Inventory")
+	void SetItemIconImage(const TSoftObjectPtr<UTexture2D>& SoftImg);
 
 	//UFUNCTION(BlueprintCallable, Category = "Appearance")
 	//UMG_API virtual void SetBrushFromSoftTexture(TSoftObjectPtr<UTexture2D> SoftTexture, bool bMatchSize = false);

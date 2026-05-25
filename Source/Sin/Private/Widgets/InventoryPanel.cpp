@@ -2,12 +2,19 @@
 
 
 #include "Widgets/InventoryPanel.h"
+
 #include "Widgets/InventorySlot.h"
 #include "Inventory/Inventory.h"
 #include "Misc/SinLibrary.h"
 #include "Components/UniformGridSlot.h" // Needed for setting slot padding
 #include "SinPlayerController.h"
 #include "SinCharacter.h"
+#include "Inventory/SinInventoryContainerTypes.h"
+#include "Inventory/SinInventoryEntryTypes.h"
+#include "Inventory/Widgets/InventoryContainerButton.h"
+#include "Inventory/Widgets/SinItemContextMenu.h"
+#include "Inventory/Widgets/SinPlayerInventoryView.h"
+#include "Blueprint/SlateBlueprintLibrary.h"
 
 UInventorySlot* UInventoryPanel::NavigateCachedSlot(EInventoryNavigationDirection Direction, bool bWrap,
 	bool bSkipEmptySlots)
@@ -363,53 +370,89 @@ void UInventoryPanel::NativeDestruct()
 		DataHolder->OnSignalItemAdded.RemoveDynamic(this, &UInventoryPanel::ItemAdded);
 		DataHolder->OnSignalItemRemoved.RemoveDynamic(this, &UInventoryPanel::ItemRemoved);
 		DataHolder->OnInventoryRefreshed.RemoveDynamic(this, &UInventoryPanel::HandleInventoryRefreshed);
+		DataHolder->OnContainerChanged.RemoveDynamic(this, &UInventoryPanel::HandleContainerChanged);
 	}
 }
 
-void UInventoryPanel::SetInventoryData(AActor* Owner)
+void UInventoryPanel::SetInventoryData_Implementation(AActor* Owner)
 {
-	if(!Owner)
+	if (!Owner){return;}
+
+	TArray<UInventory*> Inventories; Owner->GetComponents<UInventory>(Inventories);
+
+	if (Inventories.IsEmpty()){return;}
+
+	for (UInventory* LocalInventory : Inventories)
 	{
-		return;
-	}
-	TArray<UInventory*> Inventories;
-	Owner->GetComponents<UInventory>(Inventories);
-	if(Inventories.IsEmpty())
-	{
-		return;
-	}
-	for(UInventory* LocalInventory:Inventories)
-	{
-		if (LocalInventory->InventoryType == InventoryType) 
-		{ 
-			DataHolder = LocalInventory; 
+		if (!LocalInventory || LocalInventory->InventoryType != InventoryType)
+		{
+			continue;
+		}
+
+		DataHolder = LocalInventory;
+
+		if (bUseNewInventorySystem)
+		{
+			DataHolder->EnsureContainerIds();
+
+			if (!DisplayedContainerId.IsValid())
+			{
+				for (const FSinInventoryContainerState& Container : DataHolder->Containers)
+				{
+					if (Container.ContainerId.IsValid())
+					{
+						DisplayedContainerId = Container.ContainerId;
+						break;
+					}
+				}
+			}
+
+			RebuildContainerButtons();
+
+			if (DisplayedContainerId.IsValid())
+			{
+				ManageInventorySlotsV2(DisplayedContainerId);
+			}
+
+			UpdateContainerButtonStates();
+
+			if (!DataHolder->OnContainerChanged.IsAlreadyBound(this, &UInventoryPanel::HandleContainerChanged))
+			{
+				DataHolder->OnContainerChanged.AddDynamic(this, &UInventoryPanel::HandleContainerChanged);
+			}
+		}
+		else
+		{
 			ManageInventorySlots(DataHolder->InventorySize);
+
 			if (!DataHolder->OnSignalItemAdded.IsAlreadyBound(this, &UInventoryPanel::ItemAdded))
 			{
 				DataHolder->OnSignalItemAdded.AddDynamic(this, &UInventoryPanel::ItemAdded);
 			}
+
 			if (!DataHolder->OnSignalItemRemoved.IsAlreadyBound(this, &UInventoryPanel::ItemRemoved))
 			{
 				DataHolder->OnSignalItemRemoved.AddDynamic(this, &UInventoryPanel::ItemRemoved);
 			}
+
 			if (!DataHolder->OnInventoryRefreshed.IsAlreadyBound(this, &UInventoryPanel::HandleInventoryRefreshed))
 			{
 				DataHolder->OnInventoryRefreshed.AddDynamic(this, &UInventoryPanel::HandleInventoryRefreshed);
 			}
-			ASinCharacter* Character = Cast<ASinCharacter>(Owner);
-			if (Character)
+		}
+
+		if (Cast<ASinCharacter>(Owner))
+		{
+			if (UPlayerInventoryView* InventoryParent = GetTypedOuter<UPlayerInventoryView>())
 			{
-				UPlayerInventoryView* InventoryParent = GetTypedOuter<UPlayerInventoryView>();
-				if (InventoryParent)
-				{
-					float Weight = 0.0f;
-					float EquipWeight = 0.0f;
-					InventoryParent->RecalculateWeight(DataHolder, Weight, EquipWeight);
-				}
+				float Weight = 0.0f;
+				float EquipWeight = 0.0f;
+				InventoryParent->RecalculateWeight(DataHolder, Weight, EquipWeight);
 			}
-			return;
-		};
-	}	
+		}
+
+		return;
+	}
 }
 
 void UInventoryPanel::HandleInventoryRefreshed(UInventory* RefreshedInventory)
@@ -536,13 +579,219 @@ void UInventoryPanel::GetWidgetsOfClassUnderParent(TSubclassOf<UInventorySlot> W
 	}
 }
 
-void UPlayerInventoryView::RecalculateWeight_Implementation(UInventory* Holder, float& BackpackWeight, float& EquipLoad)
+void UInventoryPanel::ManageInventorySlotsV2(const FGuid& ContainerId)
 {
-	if (!Holder) { BackpackWeight = 0.0f; EquipLoad = 0.0f; return; }
-	ASinCharacter* Character = Cast<ASinCharacter>(Holder->GetOwner());
-	if (Character)
+	if (!SlotGrid || !DataHolder || !InventorySlotClass)
 	{
-		BackpackWeight = Character->GetBackpackWeight();
-		EquipLoad = Character->GetEquipLoad();
+		return;
+	}
+
+	SlotGrid->ClearChildren();
+
+	const FSinInventoryContainerState* ContainerState =
+		DataHolder->FindContainerStateById(ContainerId);
+
+	if (!ContainerState)
+	{
+		return;
+	}
+
+	int32 SlotsToCreate = ContainerState->SlotCount;
+
+	if (ContainerState->bBottomless)
+	{
+		int32 HighestUsedSlot = INDEX_NONE;
+
+		for (const FSinInventoryEntry& Entry : DataHolder->ItemInventory)
+		{
+			if (Entry.ContainerId == ContainerId)
+			{
+				HighestUsedSlot = FMath::Max(HighestUsedSlot, Entry.SlotIndex);
+			}
+		}
+
+		const int32 NeededSlots = HighestUsedSlot + 1;
+
+		SlotsToCreate = FMath::Max(
+			ContainerState->MinVisibleSlots,
+			NeededSlots
+		);
+	}
+
+	for (int32 i = 0; i < SlotsToCreate; ++i)
+	{
+		UInventorySlot* LocalSlot = CreateWidget<UInventorySlot>(this, InventorySlotClass);
+		if (!LocalSlot)
+		{
+			continue;
+		}
+
+		LocalSlot->SlotIndex = i;
+		LocalSlot->MasterPanel = this;
+
+		// New exact container identity.
+		LocalSlot->ContainerId = ContainerId;
+
+		// Optional: keep this if old/current code still uses SlotType as the container rules tag.
+		LocalSlot->SlotType = ContainerState->ContainerTag;
+
+		LocalSlot->ApplyVisualSettings(SlotSize, IconSize);
+
+		if (UUniformGridSlot* GridSlot = SlotGrid->AddChildToUniformGrid(
+			LocalSlot,
+			i / InventoryDivider,
+			i % InventoryDivider))
+		{
+			GridSlot->SetHorizontalAlignment(HAlign_Fill);
+			GridSlot->SetVerticalAlignment(VAlign_Fill);
+		}
+
+		LocalSlot->SetPadding(SlotPadding);
+
+		const FSinInventoryEntry* MatchingEntry = nullptr;
+
+		for (const FSinInventoryEntry& Entry : DataHolder->ItemInventory)
+		{
+			if (Entry.ContainerId == ContainerId && Entry.SlotIndex == i)
+			{
+				MatchingEntry = &Entry;
+				break;
+			}
+		}
+
+		if (MatchingEntry)
+		{
+			LocalSlot->RefreshSlotV2(*MatchingEntry);
+		}
+		else
+		{
+			LocalSlot->ClearSlotV2();
+		}
+	}
+}
+
+void UInventoryPanel::HandleContainerChanged(UInventory* Inventory, FGuid ContainerId)
+{
+	if (Inventory != DataHolder)
+	{
+		return;
+	}
+
+	if (ContainerId != DisplayedContainerId)
+	{
+		return;
+	}
+
+	ManageInventorySlotsV2(DisplayedContainerId);
+}
+
+void UInventoryPanel::SetDisplayedContainer(const FGuid& NewContainerId)
+{
+	if (!DataHolder || !NewContainerId.IsValid()){return;}
+
+	if (DisplayedContainerId == NewContainerId)
+	{
+		return;
+	}
+
+	const FSinInventoryContainerState* ContainerState =
+		DataHolder->FindContainerStateById(NewContainerId);
+
+	if (!ContainerState)
+	{
+		return;
+	}
+
+	DisplayedContainerId = NewContainerId;
+
+	ManageInventorySlotsV2(DisplayedContainerId);
+	UpdateContainerButtonStates();
+}
+
+void UInventoryPanel::RebuildContainerButtons()
+{
+	if (!ContainerButtonBox || !DataHolder || !ContainerButtonClass)
+	{
+		return;
+	}
+
+	ContainerButtonBox->ClearChildren();
+
+	for (const FSinInventoryContainerState& Container : DataHolder->Containers)
+	{
+		if (!Container.ContainerId.IsValid() || !Container.ContainerTag.IsValid())
+		{
+			continue;
+		}
+
+		if (!Container.bShowInContainerTabs)
+		{
+			continue;
+		}
+
+		UInventoryContainerButton* Button =
+			CreateWidget<UInventoryContainerButton>(this, ContainerButtonClass);
+
+		if (!Button)
+		{
+			continue;
+		}
+
+		Button->InitContainerButton(
+			this,
+			Container.ContainerId,
+			Container.ContainerTag,
+			Container.DisplayName
+		);
+
+		ContainerButtonBox->AddChild(Button);
+	}
+}
+
+void UInventoryPanel::UpdateContainerButtonStates()
+{
+	if (!ContainerButtonBox)
+	{
+		return;
+	}
+
+	for (UWidget* Child : ContainerButtonBox->GetAllChildren())
+	{
+		if (UInventoryContainerButton* Button = Cast<UInventoryContainerButton>(Child))
+		{
+			Button->SetSelected(Button->ContainerId == DisplayedContainerId);
+		}
+	}
+}
+
+bool UInventoryPanel::TryShowItemContextMenuFromSlot(UInventorySlot* SourceSlot)
+{
+	if (!GetOwningPlayer() || !SourceSlot || !ContextMenuClass || !DataHolder || !SourceSlot->EntryId.IsValid())
+	{
+		return false;
+	}
+	HideItemContextMenu(); APlayerController* PC = GetOwningPlayer();
+	ActiveContextMenu = CreateWidget<USinItemContextMenu>(PC, ContextMenuClass); if (!ActiveContextMenu) {return false;}
+	FVector2D MousePosition; PC->GetMousePosition(MousePosition.X, MousePosition.Y); MousePosition += FVector2D(12.f, 8.f);
+	ActiveContextMenu->InitContextMenu(this, SourceSlot);
+	ActiveContextMenu->AddToViewport(69);
+	return true;
+}
+
+void UInventoryPanel::ShowItemContextMenu(UInventorySlot* SourceSlot)
+{
+	if (!SourceSlot || !ContextMenuClass)
+	{
+		return;
+	}
+	TryShowItemContextMenuFromSlot(SourceSlot);
+}
+
+void UInventoryPanel::HideItemContextMenu()
+{
+	if (ActiveContextMenu)
+	{
+		ActiveContextMenu->RemoveFromParent();
+		ActiveContextMenu = nullptr;
 	}
 }

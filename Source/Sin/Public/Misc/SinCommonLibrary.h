@@ -76,8 +76,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sound", meta = (WorldContext = "WorldContextObject"))
 	static void PlaySoftSound2D(UObject* WorldContextObject, TSoftObjectPtr<USoundBase> SoftSound, float VolumeM =1.0f, float PitchM=1.0f, float StartTime=0.0f);
 
-	UFUNCTION(BlueprintCallable, Category = "UI")
+	UFUNCTION(BlueprintCallable, Category = "UI|Rich Text")
 	static URichTextBlock* AddStyledRichTextBlock(UPanelWidget* Panel, UDataTable* TextStyleSet, const FString Style, const FText& InText, EHorizontalAlignment Alignment = HAlign_Left);
+	
+	UFUNCTION(BlueprintPure, Category="UI|Rich Text")
+	static FText MakeRichText(FName StyleName, const FText& Text);
+	
+	UFUNCTION(BlueprintPure, Category="UI|Rich Text")
+	static FText MakeRichTextParagraphs(FName StyleName, const TArray<FText>& Paragraphs);
 	
 	UFUNCTION(BlueprintPure, Category="Input|Display")
 	static FText GetKeyDisplayTextForInputAction(

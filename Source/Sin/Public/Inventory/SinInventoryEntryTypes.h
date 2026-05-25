@@ -17,6 +17,9 @@ public:
 	// Important later for moving, saving, replication, durability, upgrades, etc.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
 	FGuid EntryId;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
+	FGuid ContainerId;
 
 	// Static item definition / template.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")

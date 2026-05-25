@@ -10,10 +10,26 @@ void UInvSlotVisual::NativeConstruct()
 	Super::NativeConstruct();
 }
 
-void UInvSlotVisual::SetItemIconImage_Implementation(TSoftObjectPtr<UTexture2D> SoftImg)
+void UInvSlotVisual::SetItemIconImage_Implementation(const TSoftObjectPtr<UTexture2D>& SoftImg)
 {
-	Icon->SetBrushFromSoftTexture(SoftImg);
-	SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (!Icon)
+	{
+		UE_LOG(LogTemp, Error, TEXT("DragVisual Icon widget is null. Check BindWidget name / Is Variable."));
+		return;
+	}
+
+	if (SoftImg.IsNull())
+	{
+		Icon->SetVisibility(ESlateVisibility::Hidden);
+		return;
+	}
+
+	Icon->SetVisibility(ESlateVisibility::Visible);
+	Icon->SetRenderOpacity(1.0f);
+	Icon->SetBrushFromSoftTexture(SoftImg, true);
+
+	SetVisibility(ESlateVisibility::Visible);
+	SetRenderOpacity(1.0f);
 }
 
 void UInvSlotVisual::NativeOnInitialized()

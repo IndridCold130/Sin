@@ -17,7 +17,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item")
 	FGameplayTagContainer ItemTags;
 	
-	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category="Item")
+	UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category="Fragments")
 	TArray<TObjectPtr<USinItemFragment>> Fragments;
 
 	template <typename T>
@@ -32,4 +32,6 @@ public:
 		}
 		return nullptr;
 	}
+	UFUNCTION(BlueprintPure, Category="Item", meta=(DeterminesOutputType="FragmentClass"))
+	USinItemFragment* FindFragmentByClass(TSubclassOf<USinItemFragment> FragmentClass) const;
 };

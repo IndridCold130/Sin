@@ -11,6 +11,10 @@
 #include "Widgets/SinHUD_Widget.h"
 #include "SinGameHUD.generated.h"
 
+class USinItemDefinition;
+class USinSplitStackDialog;
+class USinItemExamineDialog;
+class USinItemContextMenu;
 /**
  * 
  */
@@ -31,10 +35,10 @@ UPROPERTY()
 TObjectPtr<ASinPlayerController> SinController;
 
 UPROPERTY()
-TObjectPtr<USinHUD> UHUD;
+TObjectPtr<USinHUD> HUD;
 
 UPROPERTY(EditAnywhere, BlueprintReadWrite)
-TSubclassOf<USinHUD> UHUD_Subclass;
+TSubclassOf<USinHUD> HUD_Subclass;
 
 /** Soft reference to the tooltip widget class (set in the editor) */
 UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
@@ -51,6 +55,42 @@ USinItemTooltip* GetOrCreateTooltip();
 /** Function to show the tooltip at a specific location */
 UFUNCTION(BlueprintCallable, Category = "UI")
 void ShowTooltip(bool bShow, UUserWidget* Master, UGameItemBase* GameItem);
+	// NEW SHIT
+	UFUNCTION(BlueprintCallable, Category="Tooltip")
+	void ShowTooltipV2(bool bShow, UUserWidget* Master, USinItemDefinition* ItemDefinition);
+	
+public:
+	
+	UPROPERTY(EditDefaultsOnly, Category="UI|Dialogs")
+	TSubclassOf<USinSplitStackDialog> SplitStackDialogClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="UI|Dialogs")
+	TSubclassOf<USinItemExamineDialog> ItemExamineDialogClass;
+	
+	UFUNCTION(BlueprintCallable, Category="UI|Dialogs")
+	void ShowItemExamineDialog(USinItemContextMenu* ContextMenu);
+	
+	UFUNCTION(BlueprintCallable, Category="UI|Dialogs")
+	void ShowSplitStackDialog(USinItemContextMenu* ContextMenu);
+	
+	UFUNCTION(BlueprintCallable, Category="UI|Dialogs")
+	void CloseActiveModalDialog();
+	
+	UFUNCTION(BlueprintCallable, Category="UI|Dialogs")
+	void ShowSplitStackDialogForSlotDrop(UInventory* SourceInventory, const FGuid& SourceEntryId, const FGuid& TargetContainerId, int32 TargetSlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void CloseMenu();
+	
+	UPROPERTY()
+	TObjectPtr<UUserWidget> ActiveModalDialog;
+	
+	UFUNCTION(BlueprintCallable, Category="UI|Dialogs")
+	bool HasActiveModalDialog() const;
+
+	UFUNCTION(BlueprintCallable, Category="UI|Dialogs")
+	bool TryCloseTopModalDialog();
+	// NEW SHIT
 };
 
 UCLASS()
@@ -70,5 +110,14 @@ protected:
     /** The text block for the item name */
     UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
         class UTextBlock* Label;
+	
+	//UFUNCTION(BlueprintCallable, Category="Tooltip")
+	//void ShowTooltipV2(UUserWidget* Master, USinItemDefinition* ItemDefinition);
+	
+	UFUNCTION(BlueprintCallable, Category="Tooltip|Positioning")
+	FVector2D CalculateTooltipPosition(UWidget* AnchorWidget, FVector2D TooltipSize, float ToolTipPadding = 24.0f) const;
+	
+	UPROPERTY(BlueprintReadWrite, Transient)
+	UUserWidget* AnchorWidget;
 };
 

@@ -24,6 +24,9 @@ public:
 	// Longer lore/mechanical description.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Display", meta=(MultiLine="true"))
 	FText LongDescription;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Display")
+	TArray<FText> LongDescriptionParagraphs;
 
 	// Inventory / loot / hotbar icon.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Display")
@@ -32,4 +35,7 @@ public:
 	// Optional sound when picked up.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Display|Audio")
 	TSoftObjectPtr<USoundBase> PickupSound;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Display|Audio")
+	TSoftObjectPtr<USoundBase> DropSound;
 };

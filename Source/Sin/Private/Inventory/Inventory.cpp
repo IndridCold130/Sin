@@ -716,6 +716,8 @@ bool UInventory::CreateInventoryEntry(USinItemDefinition* ItemDefinition, FSinIn
 		return false;
 	}
 
+	StackCount = FMath::Max(1, StackCount);
+	
 	OutEntry = FSinInventoryEntry();
 	OutEntry.EntryId = FGuid::NewGuid();
 	OutEntry.ItemDefinition = ItemDefinition;
@@ -728,69 +730,119 @@ bool UInventory::CreateInventoryEntry(USinItemDefinition* ItemDefinition, FSinIn
 
 bool UInventory::AddItemToInventory(USinItemDefinition* ItemDefinition, int32 StackCount)
 {
-	FSinInventoryEntry NewEntry;
-	if (!CreateInventoryEntry(ItemDefinition, NewEntry, StackCount))
+	if (!ItemDefinition || StackCount <= 0)
 	{
 		return false;
 	}
 
-	FGameplayTag TargetContainer;
-	if (!FindBestContainerForItem(ItemDefinition, TargetContainer))
+	FGuid BestContainerId;
+	if (!FindBestContainerForItem(ItemDefinition, BestContainerId))
 	{
 		return false;
 	}
 
-	return AddEntryToContainer(NewEntry, TargetContainer);
+	// First, try to merge into existing stacks in this exact container.
+	StackCount = TryStackIntoExistingEntries(ItemDefinition, StackCount, BestContainerId);
+
+	if (StackCount <= 0)
+	{
+		return true;
+	}
+
+	const int32 MaxStackSize = GetMaxStackSize(ItemDefinition);
+
+	bool bAddedAnything = false;
+
+	while (StackCount > 0)
+	{
+		const int32 AmountForThisEntry = FMath::Min(StackCount, MaxStackSize);
+
+		FSinInventoryEntry NewEntry;
+		if (!CreateInventoryEntry(ItemDefinition, NewEntry, AmountForThisEntry))
+		{
+			break;
+		}
+
+		if (!AddEntryToContainer(NewEntry, BestContainerId))
+		{
+			break;
+		}
+
+		StackCount -= AmountForThisEntry;
+		bAddedAnything = true;
+	}
+
+	return bAddedAnything;
 }
 
-bool UInventory::DoesContainerAcceptItem(FGameplayTag ContainerTag, USinItemDefinition* ItemDefinition) const
+bool UInventory::DoesContainerAcceptItem(const FGuid& ContainerId, USinItemDefinition* ItemDefinition) const
 {
-	if (!ItemDefinition){return false;}
+	if (!ItemDefinition)
+	{
+		return false;
+	}
 
-	const FSinInventoryContainerState* Subinventory = FindContainerState(ContainerTag);
+	const FSinInventoryContainerState* Subinventory =
+		FindContainerStateById(ContainerId);
+
 	if (!Subinventory)
 	{
 		return false;
 	}
+
 	return Subinventory->AcceptsItemTags(ItemDefinition->ItemTags);
 }
 
-bool UInventory::IsContainerFull(FGameplayTag ContainerTag) const
+bool UInventory::IsContainerFull(const FGuid& ContainerId) const
 {
-	const FSinInventoryContainerState* Subinventory = FindContainerState(ContainerTag);
+	const FSinInventoryContainerState* Subinventory =
+		FindContainerStateById(ContainerId);
+
 	if (!Subinventory)
 	{
-		return true; // treat invalid container as "full"
+		return true; // treat invalid container as full
 	}
-	if (Subinventory->bBottomless){return false;}
-	
+
+	if (Subinventory->bBottomless)
+	{
+		return false;
+	}
+
 	int32 ItemCount = 0;
+
 	for (const FSinInventoryEntry& Entry : ItemInventory)
 	{
-		if (Entry.ContainerTag == ContainerTag)
+		if (Entry.ContainerId == ContainerId)
 		{
 			ItemCount++;
 		}
 	}
+
 	return ItemCount >= Subinventory->SlotCount;
 }
 
-bool UInventory::FindFirstFreeSlotV2(FGameplayTag ContainerTag, int32& OutSlotIndex) const
+bool UInventory::FindFirstFreeSlotV2(
+	const FGuid& ContainerId,
+	int32& OutSlotIndex,
+	USinItemDefinition* ItemDefinition) const
 {
 	OutSlotIndex = INDEX_NONE;
-	const FSinInventoryContainerState* Subinventory = FindContainerState(ContainerTag);
+
+	const FSinInventoryContainerState* Subinventory =
+		FindContainerStateById(ContainerId);
+
 	if (!Subinventory)
 	{
 		return false;
 	}
+
 	if (Subinventory->bBottomless)
 	{
-		// For bottomless/list containers, append at the end.
 		int32 MaxUsedIndex = INDEX_NONE;
 
 		for (const FSinInventoryEntry& Entry : ItemInventory)
 		{
-			if (Entry.ContainerTag == ContainerTag)
+			if (Entry.ContainerId == ContainerId)
 			{
 				MaxUsedIndex = FMath::Max(MaxUsedIndex, Entry.SlotIndex);
 			}
@@ -799,31 +851,32 @@ bool UInventory::FindFirstFreeSlotV2(FGameplayTag ContainerTag, int32& OutSlotIn
 		OutSlotIndex = MaxUsedIndex + 1;
 		return true;
 	}
+
 	for (int32 SlotIndex = 0; SlotIndex < Subinventory->SlotCount; ++SlotIndex)
 	{
-		bool bOccupied = false;
-
-		for (const FSinInventoryEntry& Entry : ItemInventory)
+		if (FindEntryIndexAtSlot(ContainerId, SlotIndex) != INDEX_NONE)
 		{
-			if (Entry.ContainerTag == ContainerTag && Entry.SlotIndex == SlotIndex)
+			continue;
+		}
+
+		if (ItemDefinition)
+		{
+			if (!DoesContainerAcceptItemAtSlot(ContainerId, SlotIndex, ItemDefinition))
 			{
-				bOccupied = true;
-				break;
+				continue;
 			}
 		}
 
-		if (!bOccupied)
-		{
-			OutSlotIndex = SlotIndex;
-			return true;
-		}
+		OutSlotIndex = SlotIndex;
+		return true;
 	}
+
 	return false;
 }
 
-bool UInventory::FindBestContainerForItem(USinItemDefinition* ItemDefinition, FGameplayTag& OutContainerTag) const
+bool UInventory::FindBestContainerForItem(USinItemDefinition* ItemDefinition, FGuid& OutContainerId) const
 {
-	OutContainerTag = FGameplayTag();
+	OutContainerId.Invalidate();
 
 	if (!ItemDefinition)
 	{
@@ -834,17 +887,23 @@ bool UInventory::FindBestContainerForItem(USinItemDefinition* ItemDefinition, FG
 
 	for (const FSinInventoryContainerState& Subinventory : Containers)
 	{
-		if (!Subinventory.ContainerTag.IsValid())
+		
+		if (!Subinventory.ContainerId.IsValid())
+		{
+			continue;
+		}
+		
+		if (!Subinventory.bAllowAutoAdd)
 		{
 			continue;
 		}
 
-		if (!DoesContainerAcceptItem(Subinventory.ContainerTag, ItemDefinition))
+		if (!DoesContainerAcceptItem(Subinventory.ContainerId, ItemDefinition))
 		{
 			continue;
 		}
 
-		if (IsContainerFull(Subinventory.ContainerTag))
+		if (IsContainerFull(Subinventory.ContainerId))
 		{
 			continue;
 		}
@@ -859,30 +918,725 @@ bool UInventory::FindBestContainerForItem(USinItemDefinition* ItemDefinition, FG
 	{
 		return false;
 	}
-	OutContainerTag = BestContainer->ContainerTag;
+
+	OutContainerId = BestContainer->ContainerId;
 	return true;
 }
 
-const FSinInventoryContainerState* UInventory::FindContainerState(FGameplayTag ContainerTag) const
+const FSinInventoryContainerState* UInventory::FindContainerStateById(const FGuid& ContainerId) const
 {
 	for (const FSinInventoryContainerState& Subinventory : Containers)
 	{
-		if (Subinventory.ContainerTag == ContainerTag)
+		if (Subinventory.ContainerId == ContainerId)
 		{
-			return &Subinventory; // pointer to element inside array
+			return &Subinventory;
 		}
 	}
-	return nullptr; // not found
+
+	return nullptr;
 }
 
-bool UInventory::AddEntryToContainer(const FSinInventoryEntry& Entry, FGameplayTag PreferredContainerTag)
+bool UInventory::AddEntryToContainer(const FSinInventoryEntry& Entry, const FGuid& PreferredContainerId)
 {
+	if (!Entry.ItemDefinition)
+	{
+		return false;
+	}
+
+	const FSinInventoryContainerState* ContainerState =
+		FindContainerStateById(PreferredContainerId);
+
+	if (!ContainerState)
+	{
+		return false;
+	}
+
+	// Rules still use the container's gameplay tag.
+	if (!DoesContainerAcceptItem(ContainerState->ContainerId, Entry.ItemDefinition))
+	{
+		return false;
+	}
+
+	int32 FreeSlot = INDEX_NONE;
+
+	if (!FindFirstFreeSlotV2(PreferredContainerId, FreeSlot, Entry.ItemDefinition))
+	{
+		return false;
+	}
+
+	FSinInventoryEntry NewEntry = Entry;
+
+	NewEntry.ContainerId = PreferredContainerId;
+	NewEntry.ContainerTag = ContainerState->ContainerTag;
+	NewEntry.SlotIndex = FreeSlot;
+
+	if (!NewEntry.EntryId.IsValid())
+	{
+		NewEntry.EntryId = FGuid::NewGuid();
+	}
+
+	ItemInventory.Add(NewEntry);
+
+	OnInventoryEntryAdded.Broadcast(this, NewEntry);
+	OnContainerChanged.Broadcast(this, PreferredContainerId);
+
+	return true;
+}
+
+bool UInventory::TransferEntryToInventory(
+	const FGuid& EntryId,
+	UInventory* TargetInventory,
+	const FGuid& TargetContainerId,
+	int32 TargetSlotIndex)
+{
+	if (!TargetInventory || !EntryId.IsValid() || !TargetContainerId.IsValid())
+	{
+		return false;
+	}
+
+	const int32 SourceIndex = FindEntryIndexById(EntryId);
+	if (SourceIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	FSinInventoryEntry& SourceEntry = ItemInventory[SourceIndex];
+
+	const FGuid SourceContainerId = SourceEntry.ContainerId;
+
+	if (!SourceContainerId.IsValid())
+	{
+		return false;
+	}
+
+	const FSinInventoryContainerState* TargetContainer =
+		TargetInventory->FindContainerStateById(TargetContainerId);
+
+	if (!TargetContainer)
+	{
+		return false;
+	}
+
+	// Source item must be allowed in target container.
+	if (!TargetInventory->DoesContainerAcceptItem(TargetContainerId, SourceEntry.ItemDefinition))
+	{
+		return false;
+	}
+
+	// Auto-slot transfer.
+	if (TargetSlotIndex == INDEX_NONE)
+	{
+		FSinInventoryEntry EntryCopy = SourceEntry;
+
+		if (!TargetInventory->AddEntryToContainer(EntryCopy, TargetContainerId))
+		{
+			return false;
+		}
+
+		ItemInventory.RemoveAt(SourceIndex);
+
+		OnInventoryEntryRemoved.Broadcast(this, EntryId);
+		OnContainerChanged.Broadcast(this, SourceContainerId);
+
+		return true;
+	}
+
+	// Validate exact target slot.
+	if (!TargetContainer->bBottomless)
+	{
+		if (TargetSlotIndex < 0 || TargetSlotIndex >= TargetContainer->SlotCount)
+		{
+			return false;
+		}
+	}
+
+	const int32 TargetEntryIndex =
+		TargetInventory->FindEntryIndexAtSlot(TargetContainerId, TargetSlotIndex);
+
+	// Exact empty slot transfer.
+	if (TargetEntryIndex == INDEX_NONE)
+	{
+		FSinInventoryEntry NewEntry = SourceEntry;
+
+		NewEntry.ContainerId = TargetContainerId;
+		NewEntry.ContainerTag = TargetContainer->ContainerTag;
+		NewEntry.SlotIndex = TargetSlotIndex;
+
+		TargetInventory->AddEntryDirect(NewEntry);
+
+		ItemInventory.RemoveAt(SourceIndex);
+
+		OnInventoryEntryRemoved.Broadcast(this, EntryId);
+		OnContainerChanged.Broadcast(this, SourceContainerId);
+
+		return true;
+	}
+
+	FSinInventoryEntry& TargetEntry =
+		TargetInventory->ItemInventory[TargetEntryIndex];
+
+	// Stack merge.
+	if (TargetInventory->CanStackEntries(SourceEntry, TargetEntry))
+	{
+		const int32 MaxStack =
+			TargetInventory->GetMaxStackSize(SourceEntry.ItemDefinition);
+
+		const int32 SpaceAvailable =
+			MaxStack - TargetEntry.StackCount;
+
+		if (SpaceAvailable > 0)
+		{
+			const int32 AmountToMove =
+				FMath::Min(SpaceAvailable, SourceEntry.StackCount);
+
+			TargetEntry.StackCount += AmountToMove;
+			SourceEntry.StackCount -= AmountToMove;
+
+			TargetInventory->OnInventoryEntryChanged.Broadcast(TargetInventory, TargetEntry);
+			TargetInventory->OnContainerChanged.Broadcast(TargetInventory, TargetContainerId);
+
+			if (SourceEntry.StackCount <= 0)
+			{
+				ItemInventory.RemoveAt(SourceIndex);
+
+				OnInventoryEntryRemoved.Broadcast(this, EntryId);
+				OnContainerChanged.Broadcast(this, SourceContainerId);
+			}
+			else
+			{
+				OnInventoryEntryChanged.Broadcast(this, SourceEntry);
+				OnContainerChanged.Broadcast(this, SourceContainerId);
+			}
+
+			return true;
+		}
+	}
+
+	// Cross-inventory swap.
+	// Target item must be allowed back into the source container.
+	if (!DoesContainerAcceptItem(SourceContainerId, TargetEntry.ItemDefinition))
+	{
+		return false;
+	}
+
+	const FSinInventoryContainerState* SourceContainer =
+		FindContainerStateById(SourceContainerId);
+
+	if (!SourceContainer)
+	{
+		return false;
+	}
+
+	const int32 SourceSlotIndex = SourceEntry.SlotIndex;
+
+	FSinInventoryEntry SourceCopy = SourceEntry;
+	FSinInventoryEntry TargetCopy = TargetEntry;
+
+	SourceCopy.ContainerId = TargetContainerId;
+	SourceCopy.ContainerTag = TargetContainer->ContainerTag;
+	SourceCopy.SlotIndex = TargetSlotIndex;
+
+	TargetCopy.ContainerId = SourceContainerId;
+	TargetCopy.ContainerTag = SourceContainer->ContainerTag;
+	TargetCopy.SlotIndex = SourceSlotIndex;
+
+	TargetInventory->ItemInventory[TargetEntryIndex] = SourceCopy;
+	ItemInventory[SourceIndex] = TargetCopy;
+
+	TargetInventory->OnInventoryEntryChanged.Broadcast(TargetInventory, SourceCopy);
+	TargetInventory->OnContainerChanged.Broadcast(TargetInventory, TargetContainerId);
+
+	OnInventoryEntryChanged.Broadcast(this, TargetCopy);
+	OnContainerChanged.Broadcast(this, SourceContainerId);
+
+	return true;
+}
+
+void UInventory::EnsureContainerIds()
+{
+	for (FSinInventoryContainerState& ContainerState : Containers)
+	{
+		if (!ContainerState.ContainerId.IsValid())
+		{
+			ContainerState.ContainerId = FGuid::NewGuid();
+		}
+	}
+}
+
+void UInventory::InitializeInventoryRuntimeState()
+{
+	if (!ContainerSet)
+	{
+		return;
+	}
+
+	Containers = ContainerSet->Containers;
+	EnsureContainerIds();
+}
+
+const FSinInventoryContainerState* UInventory::FindContainerStateByTag(FGameplayTag ContainerTag) const
+{
+	if (!ContainerTag.IsValid()){return nullptr;}
+
+	for (const FSinInventoryContainerState& SinContainer : Containers)
+	{
+		if (SinContainer.ContainerTag == ContainerTag)
+		{
+			return &SinContainer;
+		}
+	}
+	return nullptr;
+}
+
+FSinInventoryContainerState* UInventory::FindMutableContainerStateByTag(FGameplayTag ContainerTag)
+{
+	if (!ContainerTag.IsValid()){return nullptr;}
+
+	for (FSinInventoryContainerState& SinContainer : Containers)
+	{
+		if (SinContainer.ContainerTag == ContainerTag)
+		{
+			return &SinContainer;
+		}
+	}
+	return nullptr;
+}
+
+bool UInventory::FindContainerStateByTagBP(FGameplayTag ContainerTag,
+	FSinInventoryContainerState& OutContainerState) const
+{
+	if (const FSinInventoryContainerState* Found = FindContainerStateByTag(ContainerTag))
+	{
+		OutContainerState = *Found;
+		return true;
+	}
 	return false;
+}
+
+bool UInventory::AddEntryDirect(const FSinInventoryEntry& Entry)
+{
+	ItemInventory.Add(Entry);
+
+	OnInventoryEntryAdded.Broadcast(this, Entry);
+	OnContainerChanged.Broadcast(this, Entry.ContainerId);
+
+	return true;
+}
+
+bool UInventory::SplitEntryStackToSlot(
+	const FGuid& EntryId,
+	int32 SplitAmount,
+	const FGuid& TargetContainerId,
+	int32 TargetSlotIndex)
+{
+	if (!EntryId.IsValid() || !TargetContainerId.IsValid())
+	{
+		return false;
+	}
+
+	const int32 SourceIndex = FindEntryIndexById(EntryId);
+	if (SourceIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	FSinInventoryEntry& SourceEntry = ItemInventory[SourceIndex];
+
+	if (!SourceEntry.ItemDefinition || SourceEntry.StackCount <= 1)
+	{
+		return false;
+	}
+
+	if (!DoesContainerAcceptItem(TargetContainerId, SourceEntry.ItemDefinition))
+	{
+		return false;
+	}
+
+	const FSinInventoryContainerState* TargetContainer =
+		FindContainerStateById(TargetContainerId);
+
+	if (!TargetContainer)
+	{
+		return false;
+	}
+	
+	if (TargetSlotIndex == -1)
+	{
+		if (!FindFirstFreeSlotV2(TargetContainerId, TargetSlotIndex, SourceEntry.ItemDefinition))
+		{
+			return false;
+		}
+	}
+
+	if (!TargetContainer->bBottomless)
+	{
+		if (TargetSlotIndex < 0 || TargetSlotIndex >= TargetContainer->SlotCount)
+		{
+			return false;
+		}
+	}
+
+	if (FindEntryIndexAtSlot(TargetContainerId, TargetSlotIndex) != INDEX_NONE)
+	{
+		return false;	
+	}
+
+	// -1 means split stack in half.
+	if (SplitAmount == -1)
+	{
+		SplitAmount = SourceEntry.StackCount / 2;
+	}
+
+	SplitAmount = FMath::Clamp(
+		SplitAmount,
+		1,
+		SourceEntry.StackCount - 1
+	);
+
+	FSinInventoryEntry NewEntry = SourceEntry;
+	NewEntry.EntryId = FGuid::NewGuid();
+	NewEntry.ContainerId = TargetContainerId;
+	NewEntry.ContainerTag = TargetContainer->ContainerTag;
+	NewEntry.SlotIndex = TargetSlotIndex;
+	NewEntry.StackCount = SplitAmount;
+
+	SourceEntry.StackCount -= SplitAmount;
+
+	ItemInventory.Add(NewEntry);
+
+	OnInventoryEntryChanged.Broadcast(this, SourceEntry);
+	OnInventoryEntryAdded.Broadcast(this, NewEntry);
+
+	OnContainerChanged.Broadcast(this, SourceEntry.ContainerId);
+
+	if (SourceEntry.ContainerId != TargetContainerId)
+	{
+		OnContainerChanged.Broadcast(this, TargetContainerId);
+	}
+
+	return true;
+}
+
+bool UInventory::DoesContainerAcceptItemAtSlot(const FGuid& ContainerId, int32 SlotIndex,
+	USinItemDefinition* ItemDefinition) const
+{
+	if (!ItemDefinition){return false;}
+	const FSinInventoryContainerState* ContainerState = FindContainerStateById(ContainerId);
+	if (!ContainerState){return false;}
+	return ContainerState->AcceptsItemTagsAtSlot(ItemDefinition->ItemTags,SlotIndex);
 }
 
 void UInventory::NotifyInventoryChanged()
 {
 	OnInventoryRefreshed.Broadcast(this);
+}
+
+bool UInventory::MoveEntryTo(const FGuid& EntryId, const FGuid& TargetContainerId, int32 TargetSlotIndex)
+{
+	const int32 SourceIndex = FindEntryIndexById(EntryId);
+	if (SourceIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	if (!TargetContainerId.IsValid())
+	{
+		return false;
+	}
+
+	FSinInventoryEntry& SourceEntry = ItemInventory[SourceIndex];
+
+	const FGuid SourceContainerId = SourceEntry.ContainerId;
+	const FGameplayTag SourceContainerTag = SourceEntry.ContainerTag;
+	const int32 SourceSlotIndex = SourceEntry.SlotIndex;
+
+	const FSinInventoryContainerState* TargetContainer = FindContainerStateById(TargetContainerId);
+	if (!TargetContainer)
+	{
+		return false;
+	}
+
+	if (!DoesContainerAcceptItemAtSlot(
+	TargetContainerId,
+	TargetSlotIndex,
+	SourceEntry.ItemDefinition))
+	{
+		return false;
+	}
+
+	if (TargetSlotIndex == INDEX_NONE)
+	{
+		if (!FindFirstFreeSlotV2(TargetContainerId, TargetSlotIndex, SourceEntry.ItemDefinition))
+		{
+			return false;
+		}
+	}
+
+	if (!TargetContainer->bBottomless)
+	{
+		if (TargetSlotIndex < 0 || TargetSlotIndex >= TargetContainer->SlotCount)
+		{
+			return false;
+		}
+	}
+
+	const int32 TargetEntryIndex = FindEntryIndexAtSlot(TargetContainerId, TargetSlotIndex);
+
+	// Empty target slot: simple move
+	if (TargetEntryIndex == INDEX_NONE)
+	{
+		SourceEntry.ContainerId = TargetContainerId;
+		SourceEntry.ContainerTag = TargetContainer->ContainerTag;
+		SourceEntry.SlotIndex = TargetSlotIndex;
+
+		OnInventoryEntryChanged.Broadcast(this, SourceEntry);
+		OnContainerChanged.Broadcast(this, SourceContainerId);
+
+		if (SourceContainerId != TargetContainerId)
+		{
+			OnContainerChanged.Broadcast(this, TargetContainerId);
+		}
+
+		return true;
+	}
+
+	// Occupied by itself: no-op success
+	if (TargetEntryIndex == SourceIndex)
+	{
+		return true;
+	}
+
+	FSinInventoryEntry& TargetEntry = ItemInventory[TargetEntryIndex];
+
+	// Try stack merge before swap.
+	if (CanStackEntries(SourceEntry, TargetEntry))
+	{
+		const int32 MaxStackSize = GetMaxStackSize(SourceEntry.ItemDefinition);
+		const int32 SpaceAvailable = MaxStackSize - TargetEntry.StackCount;
+
+		if (SpaceAvailable > 0)
+		{
+			const int32 AmountToMove = FMath::Min(SpaceAvailable, SourceEntry.StackCount);
+
+			TargetEntry.StackCount += AmountToMove;
+			SourceEntry.StackCount -= AmountToMove;
+
+			OnInventoryEntryChanged.Broadcast(this, TargetEntry);
+
+			if (SourceEntry.StackCount <= 0)
+			{
+				const FGuid RemovedId = SourceEntry.EntryId;
+
+				ItemInventory.RemoveAt(SourceIndex);
+
+				OnInventoryEntryRemoved.Broadcast(this, RemovedId);
+				OnContainerChanged.Broadcast(this, SourceContainerId);
+
+				if (SourceContainerId != TargetContainerId)
+				{
+					OnContainerChanged.Broadcast(this, TargetContainerId);
+				}
+			}
+			else
+			{
+				OnInventoryEntryChanged.Broadcast(this, SourceEntry);
+				OnContainerChanged.Broadcast(this, SourceContainerId);
+
+				if (SourceContainerId != TargetContainerId)
+				{
+					OnContainerChanged.Broadcast(this, TargetContainerId);
+				}
+			}
+
+			return true;
+		}
+	}
+
+	// Check whether target item can go back to source container.
+	if (!DoesContainerAcceptItemAtSlot(
+	SourceContainerId,
+	SourceSlotIndex,
+	TargetEntry.ItemDefinition))
+	{
+		return false;
+	}
+
+	const FSinInventoryContainerState* SourceContainer = FindContainerStateById(SourceContainerId);
+	if (!SourceContainer)
+	{
+		return false;
+	}
+
+	// Swap
+	TargetEntry.ContainerId = SourceContainerId;
+	TargetEntry.ContainerTag = SourceContainer->ContainerTag;
+	TargetEntry.SlotIndex = SourceSlotIndex;
+
+	SourceEntry.ContainerId = TargetContainerId;
+	SourceEntry.ContainerTag = TargetContainer->ContainerTag;
+	SourceEntry.SlotIndex = TargetSlotIndex;
+
+	OnInventoryEntryChanged.Broadcast(this, SourceEntry);
+	OnInventoryEntryChanged.Broadcast(this, TargetEntry);
+
+	OnContainerChanged.Broadcast(this, SourceContainerId);
+
+	if (SourceContainerId != TargetContainerId)
+	{
+		OnContainerChanged.Broadcast(this, TargetContainerId);
+	}
+
+	return true;
+}
+
+int32 UInventory::FindEntryIndexById(const FGuid& EntryId) const
+{
+	for (int32 i = 0; i < ItemInventory.Num(); ++i)
+	{
+		if (ItemInventory[i].EntryId == EntryId)
+		{
+			return i;
+		}
+	}
+
+	return INDEX_NONE;
+}
+
+FSinInventoryEntry* UInventory::FindEntryById(const FGuid& EntryId)
+{
+	const int32 Index = FindEntryIndexById(EntryId);
+
+	if (Index == INDEX_NONE)
+	{
+		return nullptr;
+	}
+
+	return &ItemInventory[Index];
+}
+
+const FSinInventoryEntry* UInventory::FindEntryById(const FGuid& EntryId) const
+{
+	const int32 Index = FindEntryIndexById(EntryId);
+
+	if (Index == INDEX_NONE)
+	{
+		return nullptr;
+	}
+
+	return &ItemInventory[Index];
+}
+
+int32 UInventory::FindEntryIndexAtSlot(const FGuid& ContainerId, int32 SlotIndex) const
+{
+	for (int32 i = 0; i < ItemInventory.Num(); ++i)
+	{
+		const FSinInventoryEntry& Entry = ItemInventory[i];
+
+		if (Entry.ContainerId == ContainerId && Entry.SlotIndex == SlotIndex)
+		{
+			return i;
+		}
+	}
+
+	return INDEX_NONE;
+}
+
+int32 UInventory::GetMaxStackSize(USinItemDefinition* ItemDefinition) const
+{
+	if (!ItemDefinition)
+	{
+		return 1;
+	}
+
+	const USinItemFragment_Inventory* InventoryFragment =
+		ItemDefinition->FindFragmentByClass<USinItemFragment_Inventory>();
+
+	if (!InventoryFragment)
+	{
+		return 1;
+	}
+
+	return FMath::Max(1, InventoryFragment->MaxStackSize);
+}
+
+bool UInventory::CanStackEntries(const FSinInventoryEntry& A, const FSinInventoryEntry& B) const
+{
+	if (!A.ItemDefinition || !B.ItemDefinition)
+	{
+		return false;
+	}
+
+	if (A.ItemDefinition != B.ItemDefinition)
+	{
+		return false;
+	}
+
+	return GetMaxStackSize(A.ItemDefinition) > 1;
+}
+
+int32 UInventory::TryStackIntoExistingEntries(USinItemDefinition* ItemDefinition, int32 StackCount, const FGuid& ContainerId)
+{
+	if (!ItemDefinition || StackCount <= 0)
+	{
+		return StackCount;
+	}
+
+	const int32 MaxStackSize = GetMaxStackSize(ItemDefinition);
+
+	if (MaxStackSize <= 1)
+	{
+		return StackCount;
+	}
+
+	for (FSinInventoryEntry& Entry : ItemInventory)
+	{
+		if (StackCount <= 0)
+		{
+			break;
+		}
+
+		if (Entry.ContainerId != ContainerId)
+		{
+			continue;
+		}
+
+		if (Entry.ItemDefinition != ItemDefinition)
+		{
+			continue;
+		}
+
+		if (Entry.StackCount >= MaxStackSize)
+		{
+			continue;
+		}
+
+		const int32 SpaceAvailable = MaxStackSize - Entry.StackCount;
+		const int32 AmountToAdd = FMath::Min(SpaceAvailable, StackCount);
+
+		Entry.StackCount += AmountToAdd;
+		StackCount -= AmountToAdd;
+
+		OnInventoryEntryChanged.Broadcast(this, Entry);
+		OnContainerChanged.Broadcast(this, ContainerId);
+	}
+
+	return StackCount;
+}
+
+bool UInventory::GetContainerStateById(const FGuid& ContainerId, FSinInventoryContainerState& OutContainerState) const
+{
+	if (const FSinInventoryContainerState* Found = FindContainerStateById(ContainerId))
+	{
+		OutContainerState = *Found;
+		return true;
+	}
+	return false;
+}
+
+bool UInventory::PlaceEntryAtSlot(FSinInventoryEntry& IncomingEntry, int32 IncomingSourceIndex,
+	const FGuid& TargetContainerId, int32 TargetSlotIndex, UInventory* SourceInventory)
+{
+	return false;
 }
 
 void UInventory::HandleClient_Implementation(bool Added, int32 NewIndex, UGameItemBase* Item, int32 OldIndex, UInventory* SrcInventory)
@@ -906,10 +1660,120 @@ void UInventory::OnRep_Container()
 	OnInventoryRefreshed.Broadcast(this);
 }
 
+bool UInventory::MoveEntryToBestContainer(const FGuid& EntryId)
+{
+	if (!EntryId.IsValid()){return false;}
+	const int32 SourceIndex = FindEntryIndexById(EntryId);
+	if (SourceIndex == INDEX_NONE)
+	{return false;}
+	
+	const FSinInventoryEntry& SourceEntry = ItemInventory[SourceIndex];
+	
+	if (!SourceEntry.ItemDefinition){return false;}
+	
+	const FSinInventoryContainerState* BestContainer = nullptr;
+	int32 BestSlotIndex = INDEX_NONE;
+	
+	for (const FSinInventoryContainerState& SinContainer : Containers)
+	{
+		if (!SinContainer.ContainerId.IsValid())
+		{
+			continue;
+		}
+
+		// Do not unequip into equipment slots.
+		if (!SinContainer.bAllowAutoAdd)
+		{
+			continue;
+		}
+
+		if (!DoesContainerAcceptItem(SinContainer.ContainerId, SourceEntry.ItemDefinition))
+		{
+			continue;
+		}
+
+		int32 FreeSlotIndex = INDEX_NONE;
+		if (!FindFirstFreeSlotV2(
+			SinContainer.ContainerId,
+			FreeSlotIndex,
+			SourceEntry.ItemDefinition))
+		{
+			continue;
+		}
+
+		if (!BestContainer || SinContainer.SortPriority < BestContainer->SortPriority)
+		{
+			BestContainer = &SinContainer;
+			BestSlotIndex = FreeSlotIndex;
+		}
+	}
+	
+	if (!BestContainer || BestSlotIndex == INDEX_NONE){return false;}
+
+	return MoveEntryTo(EntryId,BestContainer->ContainerId,BestSlotIndex);
+}
+
+bool UInventory::EquipEntryToBestSlot(const FGuid& EntryId)
+{
+	if (!EntryId.IsValid()){return false;}
+	
+	const int32 SourceIndex = FindEntryIndexById(EntryId);
+	if (SourceIndex == INDEX_NONE){return false;}
+	
+	const FSinInventoryEntry& SourceEntry = ItemInventory[SourceIndex];
+	
+	if (!SourceEntry.ItemDefinition){return false;}
+	
+	// Find the equipment container.
+	const FSinInventoryContainerState* EquipmentContainer = nullptr;
+	
+	for (const FSinInventoryContainerState& SinContainer : Containers)
+	{
+		if (!SinContainer.ContainerId.IsValid())
+		{
+			continue;
+		}
+
+		// Equipment should normally be bAllowAutoAdd = false.
+		if (!SinContainer.bAllowAutoAdd)
+		{
+			EquipmentContainer = &SinContainer;
+			break;
+		}
+	}
+	
+	if (!EquipmentContainer){return false;}
+	
+	for (int32 SlotIndex = 0; SlotIndex < EquipmentContainer->SlotCount; ++SlotIndex)
+	{
+		if (!DoesContainerAcceptItemAtSlot(
+			EquipmentContainer->ContainerId,
+			SlotIndex,
+			SourceEntry.ItemDefinition))
+		{
+			continue;
+		}
+
+		const int32 ExistingEntryIndex =
+			FindEntryIndexAtSlot(EquipmentContainer->ContainerId, SlotIndex);
+
+		if (ExistingEntryIndex == INDEX_NONE)
+		{
+			return MoveEntryTo(
+				EntryId,
+				EquipmentContainer->ContainerId,
+				SlotIndex
+			);
+		}
+	}
+	
+	return false;
+}
+
 // Called when the game starts
 void UInventory::BeginPlay()
 {
-	Super::BeginPlay();
+	Super::BeginPlay(); InitializeInventoryRuntimeState();
 	for (EPrimaryItemType Source : TEnumRange<EPrimaryItemType>())
 	{
 		switch (Source)

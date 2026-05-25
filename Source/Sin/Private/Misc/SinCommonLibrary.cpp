@@ -305,8 +305,50 @@ URichTextBlock* USinCommonLibrary::AddStyledRichTextBlock(UPanelWidget* Panel, U
 	return RichText;
 }
 
+FText USinCommonLibrary::MakeRichText(FName StyleName, const FText& Text)
+{
+	FString SafeText = Text.ToString();
+
+	// Normalize line endings.
+	SafeText.ReplaceInline(TEXT("\r\n"), TEXT("\n"));
+
+	// Prevent accidental rich text parsing.
+	SafeText.ReplaceInline(TEXT("&"), TEXT("&amp;"));
+	SafeText.ReplaceInline(TEXT("<"), TEXT("&lt;"));
+	SafeText.ReplaceInline(TEXT(">"), TEXT("&gt;"));
+
+	return FText::FromString(
+		FString::Printf(
+			TEXT("<%s>%s</>"),
+			*StyleName.ToString(),
+			*SafeText
+		)
+	);
+}
+
+FText USinCommonLibrary::MakeRichTextParagraphs(FName StyleName, const TArray<FText>& Paragraphs)
+{
+	FString Result;
+
+	for (int32 i = 0; i < Paragraphs.Num(); ++i)
+	{
+		Result += MakeRichText(
+			StyleName,
+			Paragraphs[i]
+		).ToString();
+
+		// Add paragraph spacing.
+		if (i < Paragraphs.Num() - 1)
+		{
+			Result += TEXT("\n\n");
+		}
+	}
+
+	return FText::FromString(Result);
+}
+
 FText USinCommonLibrary::GetKeyDisplayTextForInputAction(APlayerController* PlayerController,
-	const UInputAction* InputAction, bool bGamepadMode)
+                                                         const UInputAction* InputAction, bool bGamepadMode)
 {
 	if (!PlayerController || !InputAction)
 	{

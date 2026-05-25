@@ -12,10 +12,12 @@
 #include "Misc/SinGPTs.h"
 #include "Interfaces/I_Inventory.h"
 #include "EMSCompSaveInterface.h"
+#include "GameplayTagContainer.h"
 #include "Inventory.generated.h"
 
 struct FSinInventoryEntry;
 struct FSinInventoryContainerState;
+class USinInventoryContainerSet;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(FSignaltemShiftedSignature, UInventory*, NewInventory, int32, Index, UGameItemBase*, Item, int32, SrcIndex, UInventory*, SrcInventory);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWalletUpdatedSignature, const FCharStats&, NewValue, const FCharStats&, DeltaValue);
@@ -25,7 +27,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInventoryRefreshedSignature, UInven
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FOnSinInventoryContainerChanged,
 	UInventory*, Inventory,
-	FGameplayTag, ContainerTag
+	FGuid, ContainerId
 );
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FOnSinInventoryEntryAdded,
@@ -128,21 +130,46 @@ public:
 	bool AddItemToInventory(USinItemDefinition* ItemDefinition, int32 StackCount = 1);
 	
 	UFUNCTION(BlueprintPure, Category="Inventory|New")
-	bool DoesContainerAcceptItem(FGameplayTag ContainerTag, USinItemDefinition* ItemDefinition) const;
+	bool IsContainerFull(const FGuid& ContainerId) const;
 	
 	UFUNCTION(BlueprintPure, Category="Inventory|New")
-	bool IsContainerFull(FGameplayTag ContainerTag) const;
+	bool FindFirstFreeSlotV2(const FGuid& ContainerId,int32& OutSlotIndex,USinItemDefinition* ItemDefinition = nullptr) const;
 	
 	UFUNCTION(BlueprintPure, Category="Inventory|New")
-	bool FindFirstFreeSlotV2(FGameplayTag ContainerTag, int32& OutSlotIndex) const;
+	bool DoesContainerAcceptItem(const FGuid& ContainerId, USinItemDefinition* ItemDefinition) const;
 	
 	UFUNCTION(BlueprintPure, Category="Inventory|New")
-	bool FindBestContainerForItem(USinItemDefinition* ItemDefinition, FGameplayTag& OutContainerTag) const;
-	
-	const FSinInventoryContainerState* FindContainerState(FGameplayTag ContainerTag) const;
+	bool FindBestContainerForItem(USinItemDefinition* ItemDefinition, FGuid& OutContainerId) const;
 	
 	UFUNCTION(BlueprintCallable, Category="Inventory|New")
-	bool AddEntryToContainer(const FSinInventoryEntry& Entry, FGameplayTag PreferredContainerTag);
+	bool AddEntryToContainer(const FSinInventoryEntry& Entry, const FGuid& PreferredContainerId);
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	int32 FindEntryIndexById(const FGuid& EntryId) const;
+	
+	FSinInventoryEntry* FindEntryById(const FGuid& EntryId);
+	
+	const FSinInventoryEntry* FindEntryById(const FGuid& EntryId) const;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	bool TransferEntryToInventory(const FGuid& EntryId,UInventory* TargetInventory,const FGuid& TargetContainerId,int32 TargetSlotIndex = -1);
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	void EnsureContainerIds();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory|Setup")
+	TObjectPtr<USinInventoryContainerSet> ContainerSet;
+	
+	UFUNCTION()
+	void InitializeInventoryRuntimeState();
+	
+	
+	const FSinInventoryContainerState* FindContainerStateByTag(FGameplayTag ContainerTag) const;
+	
+	FSinInventoryContainerState* FindMutableContainerStateByTag(FGameplayTag ContainerTag);
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	bool FindContainerStateByTagBP(FGameplayTag ContainerTag, FSinInventoryContainerState& OutContainerState) const;
 	//NEW SYSTEM
 
 	// DELEGATES
@@ -171,6 +198,36 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="Inventory|New")
 	FOnSinInventoryEntryChanged OnInventoryEntryChanged;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	bool MoveEntryTo(const FGuid& EntryId, const FGuid& TargetContainerId, int32 TargetSlotIndex = -1);
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	int32 FindEntryIndexAtSlot(const FGuid& ContainerId, int32 SlotIndex) const;
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	int32 GetMaxStackSize(USinItemDefinition* ItemDefinition) const;
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	bool CanStackEntries(const FSinInventoryEntry& A, const FSinInventoryEntry& B) const;
+	
+	int32 TryStackIntoExistingEntries(USinItemDefinition* ItemDefinition,int32 StackCount,const FGuid& ContainerId);
+	
+	const FSinInventoryContainerState* FindContainerStateById(const FGuid& ContainerId) const;
+
+	// Blueprint helper
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	bool GetContainerStateById(const FGuid& ContainerId, FSinInventoryContainerState& OutContainerState) const;
+	
+	bool PlaceEntryAtSlot(FSinInventoryEntry& IncomingEntry,int32 IncomingSourceIndex,const FGuid& TargetContainerId,int32 TargetSlotIndex,UInventory* SourceInventory);
+	
+	bool AddEntryDirect(const FSinInventoryEntry& Entry);
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	bool SplitEntryStackToSlot(const FGuid& EntryId,int32 SplitAmount = -1, const FGuid& TargetContainerId = FGuid(), int32 TargetSlotIndex = -1);
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|New")
+	bool DoesContainerAcceptItemAtSlot(const FGuid& ContainerId, int32 SlotIndex,USinItemDefinition* ItemDefinition) const;
 	// NEW SYSTEM
 
 	// CORE VARS
@@ -200,6 +257,12 @@ public:
 		TArray<FSinInventoryContainerState> Containers;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Inventory|Entries")
 		TArray<FSinInventoryEntry> ItemInventory;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	bool MoveEntryToBestContainer(const FGuid& EntryId);
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	bool EquipEntryToBestSlot(const FGuid& EntryId);
 	// NEW INVENTORY SYSTEM
 protected:
 	// Called when the game starts
