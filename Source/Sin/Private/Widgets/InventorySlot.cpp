@@ -16,11 +16,18 @@
 #include "Inventory/Widgets/SinItemContextMenu.h"
 #include "Misc/SinCommonLibrary.h"
 #include "Inventory/Widgets/SinEquipmentPanel.h"
+#include "Misc/SinCommonLibrary.h"
 #include "SinGameHUD.h"
 
 
 void UInventorySlot::NativeOnInitialized()
 {
+}
+
+void UInventorySlot::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+	ApplyVisualSettings(SlotSize, IconSize);
 }
 
 FReply UInventorySlot::NativeOnMouseButtonDoubleClick(
@@ -46,24 +53,20 @@ FReply UInventorySlot::NativeOnMouseButtonDoubleClick(
 	// New inventory system path.
 	if (UsesNewInventorySystem())
 	{
-		bool bResult = false;
-
-		if (EquipmentPanel)
-		{
-			// Item is currently equipped. Try to unequip into best normal container.
-			bResult = Inventory->MoveEntryToBestContainer(EntryId);
-		}
-		else
-		{
-			// Item is in backpack/storage. Try to equip it.
-			bResult = Inventory->EquipEntryToBestSlot(EntryId);
-		}
+		TSoftObjectPtr<USoundBase> PickupSound;
+		TSoftObjectPtr<USoundBase> DropSound;
+		GetItemSounds(PickupSound, DropSound);
 		
-		if (bResult){OnHovered(false);}
-		
-		return bResult
-			? FReply::Handled()
-			: FReply::Unhandled();
+		const bool bResult = Inventory->TryDoubleClickEntry(EntryId);
+		if (bResult)
+		{
+			if (!DropSound.IsNull())
+			{
+				USinCommonLibrary::PlaySoftSound2D(this, DropSound);
+			}
+			OnHovered(false);
+		}
+		return bResult ? FReply::Handled() : FReply::Unhandled();
 	}
 
 	// Old system path.
@@ -117,13 +120,24 @@ FReply UInventorySlot::NativeOnMouseButtonDown(
 				}
 
 				const int32 SplitAmount = Entry->StackCount / 2;
-
-				Inventory->SplitEntryStackToSlot(
+				
+				const bool bSplitSucceeded = Inventory->SplitEntryStackToSlot(
 					EntryId,
 					SplitAmount,
 					ContainerId,
 					FreeSlot
 				);
+				
+				if (bSplitSucceeded)
+				{
+					TSoftObjectPtr<USoundBase> PickupSound;
+					TSoftObjectPtr<USoundBase> DropSound;
+
+					if (GetItemSounds(PickupSound, DropSound) && !DropSound.IsNull())
+					{
+						USinCommonLibrary::PlaySoftSound2D(this, DropSound);
+					}
+				}
 
 				return FReply::Handled();
 			}
@@ -137,7 +151,6 @@ FReply UInventorySlot::NativeOnMouseButtonDown(
 			}
 		}
 	}
-
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
@@ -207,6 +220,15 @@ void UInventorySlot::NativeOnDragDetected(const FGeometry& MyGeometry, const FPo
 	SetDraggingVisualState(true);
 
 	Operation = Drag;
+	TSoftObjectPtr<USoundBase> PickupSound = nullptr;
+	TSoftObjectPtr<USoundBase> DropSound = nullptr;
+	GetItemSounds(PickupSound, DropSound);
+	if (!PickupSound.IsNull())
+	{
+		Drag->PickupSound = PickupSound;
+		Drag->DropSound   = DropSound;
+		USinCommonLibrary::PlaySoftSound2D(this,PickupSound);
+	}
 }
 
 void UInventorySlot::NativeOnDragCancelled(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
@@ -227,29 +249,36 @@ void UInventorySlot::NativeOnFocusLost(const FFocusEvent& InFocusEvent)
 	
 }
 
+bool UInventorySlot::GetItemSounds( TSoftObjectPtr<USoundBase>& OutPickup,  TSoftObjectPtr<USoundBase>& OutDrop) const
+{
+	OutPickup = nullptr;
+	OutDrop = nullptr;
+	UInventory* Inventory = GetOwningInventory();
+	if (!Inventory || !EntryId.IsValid()){return false;}
+	
+	const FSinInventoryEntry* Entry = Inventory->FindEntryById(EntryId);
+	if (!Entry || !Entry->ItemDefinition) {return false;}
+	
+	const USinItemFragment_Display* Display =
+		Entry->ItemDefinition->FindFragmentByClass<USinItemFragment_Display>();
+	
+	if (!Display){return false;}
+	
+	OutPickup = Display->PickupSound; OutDrop   = Display->DropSound; return true;
+}
+
 bool UInventorySlot::HandleInventoryDrop(UInventoryDragDropOperation* Operation)
 {
-	if (!Operation || !Operation->SourceSlot)
-	{
-		return false;
-	}
+	if (!Operation || !Operation->SourceSlot){return false;}
 
 	UInventorySlot* DraggedSlot = Operation->SourceSlot;
 
-	if (DraggedSlot == this)
-	{
-		DraggedSlot->SetDraggingVisualState(false);
-		return false;
-	}
+	if (DraggedSlot == this){DraggedSlot->SetDraggingVisualState(false);return false;}
 
 	UInventory* TargetInventory = GetOwningInventory();
 	UInventory* SourceInventory = DraggedSlot->GetOwningInventory();
 
-	if (!TargetInventory || !SourceInventory)
-	{
-		DraggedSlot->SetDraggingVisualState(false);
-		return false;
-	}
+	if (!TargetInventory || !SourceInventory){DraggedSlot->SetDraggingVisualState(false);return false;}
 
 	if (!UsesNewInventorySystem() || !DraggedSlot->UsesNewInventorySystem())
 	{
@@ -258,29 +287,60 @@ bool UInventorySlot::HandleInventoryDrop(UInventoryDragDropOperation* Operation)
 	}
 
 	bool bResult = false;
+	TSoftObjectPtr<USoundBase> PickupSound = nullptr;
+	TSoftObjectPtr<USoundBase> DropSound = nullptr;
 
 	if (Operation->bWantsStackSplit)
 	{
 		const FSinInventoryEntry* SourceEntry =
-			SourceInventory->FindEntryById(Operation->EntryId);
+		SourceInventory->FindEntryById(Operation->EntryId);
 
-		if (SourceEntry && SourceEntry->StackCount > 1)
+		if (!SourceEntry || SourceEntry->StackCount <= 1)
 		{
-			if (ASinGameHUD* HUD = USinCommonLibrary::GetSinGameHUD(this))
-			{
-				HUD->ShowSplitStackDialogForSlotDrop(
-					SourceInventory,
-					Operation->EntryId,
-					ContainerId,
-					SlotIndex
-				);
+			DraggedSlot->SetDraggingVisualState(false);
+			return false;
+		}
 
-				bResult = true;
+		// ----- NEW: validate the target slot first -----
+		const bool bTargetAcceptsItem = TargetInventory->DoesContainerAcceptItemAtSlot(
+			ContainerId,
+			SlotIndex,
+			SourceEntry->ItemDefinition
+		);
+
+		if (!bTargetAcceptsItem)
+		{
+			DraggedSlot->SetDraggingVisualState(false);
+			return false;		// do NOT open the dialog
+		}
+
+		// Optional extra: if the slot is occupied, only allow if it can stack
+		const int32 TargetEntryIndex = TargetInventory->FindEntryIndexAtSlot(ContainerId, SlotIndex);
+		if (TargetEntryIndex != INDEX_NONE)
+		{
+			const FSinInventoryEntry& TargetEntry = TargetInventory->ItemInventory[TargetEntryIndex];
+
+			if (!TargetInventory->CanStackEntries(*SourceEntry, TargetEntry))
+			{
+				DraggedSlot->SetDraggingVisualState(false);
+				return false;	// occupied by something that can’t stack
 			}
+		}
+		// -----------------------------------------------
+
+		if (ASinGameHUD* HUD = USinCommonLibrary::GetSinGameHUD(this))
+		{
+			HUD->ShowSplitStackDialogForSlotDrop(
+				SourceInventory,
+				TargetInventory,
+				Operation->EntryId,
+				ContainerId,
+				SlotIndex
+			);
 		}
 
 		DraggedSlot->SetDraggingVisualState(false);
-		return bResult;
+		return true;
 	}
 
 	if (SourceInventory == TargetInventory)
@@ -302,6 +362,13 @@ bool UInventorySlot::HandleInventoryDrop(UInventoryDragDropOperation* Operation)
 	}
 
 	DraggedSlot->SetDraggingVisualState(false);
+	if (bResult)
+	{
+		if (Operation->DropSound)
+		{
+			USinCommonLibrary::PlaySoftSound2D(this,Operation->DropSound);
+		}
+	}
 	return bResult;
 }
 
@@ -493,7 +560,7 @@ void UInventorySlot::BeginTooltipHover()
 		TooltipDelayHandle,
 		this,
 		&UInventorySlot::ShowTooltipDelayed,
-		0.23f,
+		TooltipDelay,
 		false
 	);
 }
@@ -665,22 +732,18 @@ UUserWidget* UInventorySlot::CreateContextMenuWidget()
 	return Menu;
 }
 
-void UInventorySlot::InitEquipmentSlot(USinEquipmentPanel* InEquipmentPanel, const FGuid& InContainerId, int32 InSlotIndex)
+void UInventorySlot::InitFixedContainerSlot(UUserWidget* InOwningPanel,const FGuid& InContainerId,int32 InSlotIndex)
 {
-	if (!InEquipmentPanel)
-	{
-		return;
-	}
+	if (!InOwningPanel){return;}
+	
+	MasterPanel = Cast<UInventoryPanel>(InOwningPanel);
+	EquipmentPanel = Cast<USinEquipmentPanel>(InOwningPanel);
+	//QuickslotPanel = Cast<USinQuickslotPanel>(InOwningPanel);
 
-	MasterPanel = nullptr; // unless EquipmentPanel inherits InventoryPanel
-	EquipmentPanel = InEquipmentPanel; // add this member if needed
-
-	ContainerId = InContainerId;
-	SlotIndex = InSlotIndex;
+	ContainerId = InContainerId; SlotIndex = InSlotIndex;
 
 	EntryId.Invalidate();
 
-	// Optional: show empty equipment icon based on slot rule later.
 	ClearSlotV2();
 }
 

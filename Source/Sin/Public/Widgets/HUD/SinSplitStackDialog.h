@@ -27,7 +27,7 @@ class SIN_API USinSplitStackDialog : public USinItemDialogue
 public:
 	virtual void InitFromContextMenu(USinItemContextMenu* ContextMenu) override;
 	
-	void InitFromDrag(UInventory* Inventory, const FGuid& IncomingSourceEntryId,
+	void InitFromDrag(UInventory* Source, UInventory* Target, const FGuid& IncomingSourceEntryId,
 	const FGuid& TargetContainerId, int32 TargetSlotIndex);
 	
 	UPROPERTY(BlueprintReadOnly, Category="Item Dialog")
@@ -82,6 +82,9 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category="Item Dialog")
 	FGuid SourceContainerId;
+	
+	UPROPERTY(BlueprintReadOnly, Category="Item Dialog")
+	TObjectPtr<UInventory> TargetInventory;
 
 	UFUNCTION(BlueprintCallable, Category="Item Dialog")
 	void SetSplitSource(

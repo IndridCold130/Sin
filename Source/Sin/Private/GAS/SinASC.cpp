@@ -17,6 +17,12 @@
 #include "GAS/Effects/Sin_GAS_Buff.h"
 #include "Misc/SinGPTs.h"
 #include "Misc/SinCommonLibrary.h"
+#include "Inventory/SinInventoryEntryTypes.h"
+#include "Inventory/SinInventoryContainerTypes.h"
+#include "Inventory/Items/SinItemFragment_GrantedEffects.h"
+#include "Inventory/Items/SinItemDefinition.h"
+#include "Inventory/Items/SinItemFragment_GrantedPerks.h"
+#include "Inventory/Items/SinItemFragment_Stats.h"
 //#include "UE5Coro.h"
 
 USinASC::USinASC(const FObjectInitializer& ObjectInitializer)
@@ -34,11 +40,22 @@ void USinASC::BeginPlay()
 	{
 		InitAbilityActorInfo(GetOwner(), GetOwner());
 		InitializeAbilitySystem();
-		Gear = Cast<UEquipment>(GetOwner()->GetComponentByClass(UEquipment::StaticClass()));
+		Gear = Cast<UInventory>(
+	GetOwner()->FindComponentByTag(
+		UInventory::StaticClass(),
+		FName("Backpack")
+	)
+);
+		//Gear = Cast<UInventory>(GetOwner()->GetComponentByClass(UEquipment::StaticClass()));
 		if (Gear)
 		{
-			Gear->OnSignalItemAdded.AddDynamic(this, &USinASC::ItemAdded);
-			Gear->OnSignalItemRemoved.AddDynamic(this, &USinASC::ItemRemoved);
+			//Gear->OnSignalItemAdded.AddDynamic(this, &USinASC::ItemAdded);
+			//Gear->OnSignalItemRemoved.AddDynamic(this, &USinASC::ItemRemoved);
+			
+			Gear->OnInventoryEntryAdded.AddDynamic(this, &USinASC::HandleInventoryEntryAdded);
+			Gear->OnInventoryEntryRemoved.AddDynamic(this, &USinASC::HandleInventoryEntryRemoved);
+			Gear->OnInventoryEntryChanged.AddDynamic(this, &USinASC::HandleInventoryEntryChanged);
+			Gear->OnContainerChanged.AddDynamic(this, &USinASC::HandleInventoryContainerChanged);
 		}
 	}
 }
@@ -1075,6 +1092,154 @@ bool USinASC::IsGameplayEffectHandleValid(FActiveGameplayEffectHandle Handle) co
 	return Handle.IsValid() && GetActiveGameplayEffect(Handle) != nullptr;
 }
 
+bool USinASC::ShouldApplyItemFragment(const FSinInventoryEntry& Entry, ESinItemEffectApplicationPolicy Policy) const
+{
+	if (!Gear){return false;}
+	switch (Policy)
+	{
+	case ESinItemEffectApplicationPolicy::Never:
+		return false;
+
+	case ESinItemEffectApplicationPolicy::Always:
+		return true;
+
+	case ESinItemEffectApplicationPolicy::WhileInInventory:
+		return true;
+
+	case ESinItemEffectApplicationPolicy::WhileEquipped:
+		{
+			const FSinInventoryContainerState* Container =
+				Gear->FindContainerStateById(Entry.ContainerId);
+
+			if (!Container)
+			{
+				return false;
+			}
+
+			return Container->ContainerTag.MatchesTag(
+				TAG_Item_Equipment);
+		}
+	}
+
+	return false;
+}
+
+void USinASC::RefreshItemGrantedEffects()
+{
+	if (!Gear){return;}
+}
+
+void USinASC::HandleInventoryEntryAdded(UInventory* Inventory, const FSinInventoryEntry& Entry)
+{
+	if (const USinItemFragment_Stats* BonusStats =
+Entry.ItemDefinition->GetStatsFragment())
+	{
+		if (ShouldApplyItemFragment(Entry, BonusStats->ApplicationPolicy))
+		{
+			ManageAttributeBonuses(TAG_Gear, true, BonusStats->Additives);
+			ManageAttributeBonuses(TAG_Gear_Mult, true, BonusStats->Multiplicatives);
+		}
+	}
+	if (const USinItemFragment_GrantedEffects* Effects =
+Entry.ItemDefinition->GetGrantedEffectsFragment())
+	{
+		if (ShouldApplyItemFragment(Entry, Effects->ApplicationPolicy))
+		{
+			SinApplyBuffsOfSource(TAG_Source_Gear, Effects->Passives); GrantPassiveAbilities(Effects->Procs);
+		}
+	}
+	if (const USinItemFragment_GrantedPerks* Perks =
+Entry.ItemDefinition->GetPerksFragment())
+	{
+		if (ShouldApplyItemFragment(Entry, Perks->ApplicationPolicy))
+		{
+			GrantBonusPerks(Perks->BonusPerks, true);
+		}
+	}
+}
+
+void USinASC::HandleInventoryEntryRemoved(UInventory* Inventory, const FSinInventoryEntry& RemovedEntry)
+{
+	RefreshItemGrantedEffects();
+}
+
+void USinASC::HandleInventoryEntryChanged(
+	UInventory* Inventory,
+	const FSinInventoryEntry& OldEntry,
+	const FSinInventoryEntry& Entry)
+{
+	if (!Entry.ItemDefinition)
+	{
+		return;
+	}
+
+	if (const USinItemFragment_Stats* BonusStats =
+		Entry.ItemDefinition->GetStatsFragment())
+	{
+		const bool bWasApplied =
+			ShouldApplyItemFragment(OldEntry, BonusStats->ApplicationPolicy);
+
+		const bool bShouldApply =
+			ShouldApplyItemFragment(Entry, BonusStats->ApplicationPolicy);
+
+		if (bWasApplied && !bShouldApply)
+		{
+			ManageAttributeBonuses(TAG_Gear, false, BonusStats->Additives);
+			ManageAttributeBonuses(TAG_Gear_Mult, false, BonusStats->Multiplicatives);
+		}
+		else if (!bWasApplied && bShouldApply)
+		{
+			ManageAttributeBonuses(TAG_Gear, true, BonusStats->Additives);
+			ManageAttributeBonuses(TAG_Gear_Mult, true, BonusStats->Multiplicatives);
+		}
+	}
+
+	if (const USinItemFragment_GrantedEffects* Effects =
+		Entry.ItemDefinition->GetGrantedEffectsFragment())
+	{
+		const bool bWasApplied =
+			ShouldApplyItemFragment(OldEntry, Effects->ApplicationPolicy);
+
+		const bool bShouldApply =
+			ShouldApplyItemFragment(Entry, Effects->ApplicationPolicy);
+
+		if (bWasApplied && !bShouldApply)
+		{
+			// remove gear-sourced effects here
+			RemoveGrantedEffectsFragment(Effects);
+		}
+		else if (!bWasApplied && bShouldApply)
+		{
+			SinApplyBuffsOfSource(TAG_Source_Gear, Effects->Passives);
+			GrantPassiveAbilities(Effects->Procs);
+		}
+	}
+
+	if (const USinItemFragment_GrantedPerks* Perks =
+		Entry.ItemDefinition->GetPerksFragment())
+	{
+		const bool bWasApplied =
+			ShouldApplyItemFragment(OldEntry, Perks->ApplicationPolicy);
+
+		const bool bShouldApply =
+			ShouldApplyItemFragment(Entry, Perks->ApplicationPolicy);
+
+		if (bWasApplied && !bShouldApply)
+		{
+			GrantBonusPerks(Perks->BonusPerks, false);
+		}
+		else if (!bWasApplied && bShouldApply)
+		{
+			GrantBonusPerks(Perks->BonusPerks, true);
+		}
+	}
+}
+
+void USinASC::HandleInventoryContainerChanged(UInventory* Inventory, FGuid ContainerId)
+{
+	RefreshItemGrantedEffects();
+}
+
 void USinASC::ItemAdded(UInventory* NewInventory, int32 Index, UGameItemBase* Item, int32 SrcIndex, UInventory* SrcInventory)
 {
 	UGameItemEquipment* LocalEquipment = Cast<UGameItemEquipment>(Item);
@@ -1118,6 +1283,39 @@ void USinASC::ItemRemoved(UInventory* NewInventory, int32 Index, UGameItemBase* 
 		GrantBonusPerks(Item->GetBonusPerks(), false);
 		//PerkRemove(FGameplayTag ClassTag, FSinPerkRow Perk, int32 Ranks, bool bBonus)
 	}
+}
+
+void USinASC::RemoveGrantedEffectsFragment(const USinItemFragment_GrantedEffects* Effects)
+{
+	if (!Effects){return;}
+
+	for (const auto& Pair : Effects->Passives)
+	{
+		const TSubclassOf<USin_GAS_Buff>& BuffClass = Pair.Key;
+		const int32 StackCount = Pair.Value;
+
+		if (!BuffClass)
+		{
+			continue;
+		}
+
+		FActiveGameplayEffectHandle Handle =
+			BuffManager.GetEffectHandle(BuffClass);
+
+		const int32 StacksToRemove =
+			BuffManager.ShouldRemoveBuff(
+				BuffClass,
+				TAG_Source_Gear,
+				StackCount
+			);
+
+		if (StacksToRemove >= 0)
+		{
+			RemoveActiveGameplayEffect(Handle, StacksToRemove);
+		}
+	}
+
+	RemovePassiveAbilities(Effects->Procs);
 }
 
 void USinASC::AbilityInputTagPressed(const FGameplayTag& InputTag)

@@ -274,18 +274,25 @@ void USinCommonLibrary::PlaySoftSoundAtLocation(UObject* WorldContextObject, TSo
 
 void USinCommonLibrary::PlaySoftSound2D(UObject* WorldContextObject, TSoftObjectPtr<USoundBase> SoftSound, float VolumeM, float PitchM, float StartTime)
 {
-	if (auto* sound = SoftSound.Get())
-	{
-		UGameplayStatics::PlaySound2D(WorldContextObject, sound, VolumeM, PitchM, StartTime);
-	}
-	else if (!SoftSound.IsNull())
+	if (SoftSound.IsNull()){return;}
+	if (auto* sound = SoftSound.Get()){UGameplayStatics::PlaySound2D(WorldContextObject, sound, VolumeM, PitchM, StartTime); return;}
+	
+	FSoftObjectPath Path = SoftSound.ToSoftObjectPath();
+	
+	if (!SoftSound.IsNull())
 	{
 		UAssetManager::GetStreamableManager()
 			.RequestAsyncLoad(SoftSound.ToSoftObjectPath(),
-				[WorldContextObject, sound, VolumeM, PitchM, StartTime]
-				{PlaySoftSound2D(WorldContextObject, sound, VolumeM, PitchM, StartTime); }
+				[WorldContextObject, SoftSound, VolumeM, PitchM, StartTime]
+				{
+					if (USoundBase* LoadedSound = SoftSound.Get())
+					{UGameplayStatics::PlaySound2D(WorldContextObject,LoadedSound, VolumeM, PitchM, StartTime);
+					}
+				}
 			);
 	}
+	
+	//{PlaySoftSound2D(WorldContextObject, sound, VolumeM, PitchM, StartTime); }
 }
 
 URichTextBlock* USinCommonLibrary::AddStyledRichTextBlock(UPanelWidget* Panel, UDataTable* TextStyleSet, const FString Style, const FText& InText, EHorizontalAlignment Alignment)

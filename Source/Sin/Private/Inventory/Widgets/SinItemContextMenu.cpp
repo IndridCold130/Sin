@@ -13,6 +13,7 @@
 #include "Inventory/SinInventoryEntryTypes.h"
 #include "Inventory/Items/SinItemDefinition.h"
 #include "Inventory/Items/SinItemFragment_Equipment.h"
+#include "Inventory/SinInventoryContainerTypes.h"
 #include "Misc/SinCommonLibrary.h"
 #include "SinGameHUD.h"
 
@@ -89,6 +90,24 @@ void USinItemContextMenu::AddContextButton(const FText& Label, ESinItemContextAc
 
 void USinItemContextMenu::HandleContextButtonClicked(ESinItemContextAction Action)
 {
+	UInventory* Inventory = SourceInventory;
+	if (!Inventory && SourceSlot)
+	{
+		Inventory = SourceSlot->GetOwningInventory();
+	}
+
+	FGuid EntryId;
+	if (SourceSlot && SourceSlot->EntryId.IsValid())
+	{
+		EntryId = SourceSlot->EntryId;
+	}
+	else if (Entry)
+	{
+		EntryId = Entry->EntryId;
+	}
+
+	bool bDidSomething = false;
+
 	switch (Action)
 	{
 	case ESinItemContextAction::Split:
@@ -105,25 +124,67 @@ void USinItemContextMenu::HandleContextButtonClicked(ESinItemContextAction Actio
 		}
 		break;
 
+	case ESinItemContextAction::Equip:
+		if (Inventory && EntryId.IsValid())
+		{
+			bDidSomething = Inventory->EquipEntryToBestSlot(EntryId);
+		}
+		break;
+
+	case ESinItemContextAction::Unequip:
+		if (Inventory && EntryId.IsValid())
+		{
+			bDidSomething = Inventory->MoveEntryToBestContainer(EntryId);
+		}
+		break;
+
+	case ESinItemContextAction::Drop:
+	case ESinItemContextAction::Close:
 	default:
 		break;
 	}
-	if (SourceSlot){SourceSlot->ContextAnchor->Close();}
+
+	if (SourceSlot && SourceSlot->ContextAnchor)
+	{
+		SourceSlot->ContextAnchor->Close();
+	}
+}
+
+bool USinItemContextMenu::IsEntryInSpecializedContainer() const
+{
+	if (!SourceInventory || !Entry) {return false;}
+	
+	const FSinInventoryContainerState* Container = SourceInventory->FindContainerStateById(Entry->ContainerId); if(!Container){return false;}
+	return !Container->bAllowAutoAdd;
+}
+
+bool USinItemContextMenu::CanSmartEquipEntry() const
+{
+	if (!ItemDefinition){return false;}
+	if (ItemDefinition->FindFragmentByClass<USinItemFragment_Equipment>()) {return true;}
+	
+	return ItemDefinition->ItemTags.HasTag(TAG_Item_Equipment_Utility)
+		|| ItemDefinition->ItemTags.HasTag(TAG_Item_Equipment_Ammo)
+		|| ItemDefinition->ItemTags.HasTag(TAG_Item_Equipment_Weapon);	
 }
 
 void USinItemContextMenu::BuildDefaultButtons()
 {
-	if (!ButtonBox || !ContextMenuButtonClass){return;} ButtonBox->ClearChildren();
+	if (!ButtonBox || !ContextMenuButtonClass || !Entry || !ItemDefinition){return;} ButtonBox->ClearChildren();
 	
-	if (Entry->StackCount > 1)
+	if (Entry->StackCount > 1){AddContextButton(FText::FromString(TEXT("Split")), ESinItemContextAction::Split);}
+	
+	const bool bIsInSpecializedContainer = IsEntryInSpecializedContainer();
+	
+	if (bIsInSpecializedContainer)
 	{
-		AddContextButton(FText::FromString(TEXT("Split")), ESinItemContextAction::Split);
+		AddContextButton(FText::FromString(TEXT("Unequip")), ESinItemContextAction::Unequip);
 	}
-	
-	if (ItemDefinition->FindFragmentByClass<USinItemFragment_Equipment>())
+	else if (CanSmartEquipEntry())
 	{
 		AddContextButton(FText::FromString(TEXT("Equip")), ESinItemContextAction::Equip);
 	}
+	
 	AddContextButton(FText::FromString(TEXT("Examine")), ESinItemContextAction::Examine);
 	AddContextButton(FText::FromString(TEXT("Drop")), ESinItemContextAction::Drop);
 	AddContextButton(FText::FromString(TEXT("Close")), ESinItemContextAction::Close);

@@ -34,6 +34,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Equipment")
 	FGameplayTag EquipmentContainerTag;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Equipment")
+	FGameplayTag UtilityContainerTag;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
+	FGameplayTag WeaponContainerTag;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Equipment")
+	FGameplayTag AmmoContainerTag;
+	
 	UFUNCTION(BlueprintCallable, Category="Inventory|Equipment")
 	void InitializeEquipmentSlots();
 	
@@ -42,6 +51,27 @@ public:
 	
 	UFUNCTION()
 	void HandleEquipmentContainerChanged(UInventory* Inventory, FGuid ContainerId);
+	
+	UFUNCTION()
+	void HandleInventoryEntryAdded(UInventory* Inventory, const FSinInventoryEntry& Entry);
+
+	UFUNCTION()
+	void HandleInventoryEntryRemoved(UInventory* Inventory, const FSinInventoryEntry& RemovedEntry);
+
+	UFUNCTION()
+	void HandleInventoryEntryChanged(UInventory* Inventory, const FSinInventoryEntry& OldEntry, const FSinInventoryEntry& NewEntry);
+	
+	UFUNCTION()
+	UInventorySlot* GetSlotWidgetByLocation(const FGuid& ContainerId, int32 SlotIndex) const;
+	
+	UFUNCTION()
+	void RefreshSlotIfRelevant(const FGuid& ContainerId, int32 SlotIndex);
+
+	UFUNCTION()
+	void RefreshEntryLocation(const FSinInventoryEntry& Entry);
+	
+	UFUNCTION()
+	bool IsRelevantEntry(const FSinInventoryEntry& Entry) const;
 	
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget), Category="Inventory|Equipment")
 	TObjectPtr<UInventorySlot> HeadSlot;
@@ -66,4 +96,40 @@ public:
 	
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidget), Category="Inventory|Equipment")
 	TObjectPtr<UInventorySlot> RingSlot2;
+	
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidget), Category="Inventory|Equipment")
+	TObjectPtr<UInventorySlot> UtilitySlot1;
+	
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidget), Category="Inventory|Equipment")
+	TObjectPtr<UInventorySlot> UtilitySlot2;
+	
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidget), Category="Inventory|Equipment")
+	TObjectPtr<UInventorySlot> UtilitySlot3;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Inventory|Equipment")
+	TObjectPtr<UInventorySlot> WeaponSlot0;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Inventory|Equipment")
+	TObjectPtr<UInventorySlot> WeaponSlot1;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Inventory|Equipment")
+	TObjectPtr<UInventorySlot> WeaponSlot2;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Inventory|Equipment")
+	TObjectPtr<UInventorySlot> WeaponSlot3;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Inventory|Equipment")
+	TObjectPtr<UInventorySlot> AmmoSlot1;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Inventory|Equipment")
+	TObjectPtr<UInventorySlot> AmmoSlot2;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Inventory|Equipment")
+	TObjectPtr<UInventorySlot> AmmoSlot3;
+	
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	void ClearEquipmentData();
+
+
+	virtual void NativeDestruct() override;
 };

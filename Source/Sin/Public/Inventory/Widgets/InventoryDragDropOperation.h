@@ -15,6 +15,12 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 	TObjectPtr<UInventorySlot> SourceSlot;
+	
+	UPROPERTY()
+	TSoftObjectPtr<USoundBase> PickupSound;
+
+	UPROPERTY()
+	TSoftObjectPtr<USoundBase> DropSound;
 
 	UPROPERTY(BlueprintReadWrite)
 	FGuid EntryId;

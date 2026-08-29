@@ -147,12 +147,12 @@ void ASinGameHUD::CloseActiveModalDialog()
 	}
 }
 
-void ASinGameHUD::ShowSplitStackDialogForSlotDrop(UInventory* SourceInventory, const FGuid& SourceEntryId,
+void ASinGameHUD::ShowSplitStackDialogForSlotDrop(UInventory* SourceInventory, UInventory* TargetInventory, const FGuid& SourceEntryId,
 	const FGuid& TargetContainerId, int32 TargetSlotIndex)
 {
 	USinSplitStackDialog* Dialog = CreateWidget<USinSplitStackDialog>(GetOwningPlayerController(), SplitStackDialogClass);
 	if (!Dialog){return;}
-	Dialog->InitFromDrag(SourceInventory, SourceEntryId,
+	Dialog->InitFromDrag(SourceInventory, TargetInventory, SourceEntryId,
 	TargetContainerId, TargetSlotIndex);
 	Dialog->AddToViewport(120); ActiveModalDialog = Dialog;
 	Dialog->SetIsFocusable(true);

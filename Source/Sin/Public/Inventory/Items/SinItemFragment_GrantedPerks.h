@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "SinItemFragment.h"
 #include "GameplayTagContainer.h"
+#include "SinGlobalStructs.h"
 #include "SinItemFragment_GrantedPerks.generated.h"
 
 USTRUCT(BlueprintType)
@@ -11,7 +12,6 @@ struct FSinGrantedPerkModifier
 	GENERATED_BODY()
 
 public:
-
 	// Examples:
 	// Perk.SwordMastery
 	// Skill.Fireball
@@ -35,7 +35,12 @@ class SIN_API USinItemFragment_GrantedPerks : public USinItemFragment
 
 public:
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Application")
+	ESinItemEffectApplicationPolicy ApplicationPolicy = ESinItemEffectApplicationPolicy::WhileEquipped;
 	// Static perk/skill/mastery rank bonuses while equipped.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Perks")
 	TArray<FSinGrantedPerkModifier> GrantedPerks;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Perks")
+	TArray<FItemGrantedPerk> BonusPerks;
 };

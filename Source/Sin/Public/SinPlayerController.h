@@ -174,4 +174,6 @@ private:
 	void Input_ActionSpecial(const FInputActionValue& InputActionValue);
 	void Input_SwapMainHand(const FInputActionValue& InputActionValue);
 	void Input_SwapOffHand(const FInputActionValue& InputActionValue);
+	void Input_QuickSlotUse(const FInputActionInstance& InputActionValue);
+	void Input_QuickSlotCycle(const FInputActionInstance& InputActionValue);
 };

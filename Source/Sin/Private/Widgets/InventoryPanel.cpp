@@ -450,7 +450,6 @@ void UInventoryPanel::SetInventoryData_Implementation(AActor* Owner)
 				InventoryParent->RecalculateWeight(DataHolder, Weight, EquipWeight);
 			}
 		}
-
 		return;
 	}
 }

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "SinItemFragment.h"
 #include "GameplayTagContainer.h"
+#include "Engine/StreamableRenderAsset.h"
 #include "SinItemFragment_Equipment.generated.h"
 
 UCLASS(BlueprintType, EditInlineNew, DefaultToInstanced)
@@ -41,11 +42,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Equipment|Durability")
 	bool bUsesDurability = true;
 
-	// Mesh used for male/default body.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Equipment|Visual")
-	TSoftObjectPtr<UObject> Mesh;
+	TSoftObjectPtr<UStreamableRenderAsset> Mesh;
 
-	// Optional alternate mesh.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Equipment|Visual")
-	TSoftObjectPtr<UObject> MeshFemale;
+	TSoftObjectPtr<UStreamableRenderAsset> MeshFemale;
 };

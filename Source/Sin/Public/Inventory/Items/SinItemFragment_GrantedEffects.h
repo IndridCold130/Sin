@@ -9,6 +9,8 @@
 class UNiagaraSystem;
 class USoundBase;
 class UGameplayEffect;
+class USin_GAS_Buff;
+class USinGameplayAbility;
 
 USTRUCT(BlueprintType)
 struct FSinItemGrantedEffect
@@ -16,7 +18,7 @@ struct FSinItemGrantedEffect
 	GENERATED_BODY()
 
 public:
-
+	
 	// Optional label for editor clarity.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effect")
 	FText DisplayName;
@@ -50,11 +52,17 @@ class SIN_API USinItemFragment_GrantedEffects : public USinItemFragment
 
 public:
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Application")
+	ESinItemEffectApplicationPolicy ApplicationPolicy = ESinItemEffectApplicationPolicy::WhileEquipped;
+	
 	// Passive effects applied while equipped.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
-	TArray<FSinItemGrantedEffect> PassiveEffects;
+	TMap<TSubclassOf<USin_GAS_Buff>, int32> Passives;
 
 	// Conditional effects triggered by gameplay events.
+	//UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
+	//TArray<FSinItemGrantedEffect> ProcEffects;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
-	TArray<FSinItemGrantedEffect> ProcEffects;
+	TMap<TSubclassOf<USinGameplayAbility>, int32> Procs;
 };

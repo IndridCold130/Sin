@@ -22,7 +22,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSignalDamageReport, USinASC*, Da
 /**
  * 
  */
- // STRUCTURAS
+ // STRUCTURES
 
 USTRUCT(BlueprintType)
 struct FBuffMetaData
@@ -150,7 +150,7 @@ public:
 		ActiveBuffs.Remove(BuffClass);
 	}
 };
-// STRUCTURAS
+// STRUCTURES
 
 UCLASS()
 class SIN_API USinASC : public UAbilitySystemComponent
@@ -199,7 +199,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GAS_Class_Management")
 	void GrantAbilities(TArray<TSubclassOf<UGameplayAbility>> Abilities, const FActiveGameplayEffectHandle& ClassHandle);
 	UFUNCTION(BlueprintCallable, Category = "Abilities")
-	FAsyncCoroutine GrantBonusPerks(TArray< FItemGrantedPerk> Perks, bool bGrant = true);
+	FAsyncCoroutine GrantBonusPerks(TArray<FItemGrantedPerk> Perks, bool bGrant = true);
 	UFUNCTION(BlueprintCallable, Category = "Passive_Abilities")
 	void GrantPassiveAbilities(const TMap<TSubclassOf<USinGameplayAbility>, int32>& PassiveAbilities);
 	UFUNCTION(BlueprintCallable, Category = "Passive_Abilities")
@@ -212,13 +212,39 @@ public:
 	bool RemoveCachedClass(FActiveGameplayEffectHandle ClassHandle);
 	UFUNCTION(BlueprintPure, Category = "GameplayEffects")
 	bool IsGameplayEffectHandleValid(FActiveGameplayEffectHandle Handle) const;
+	// NEW
 	UPROPERTY(BlueprintReadOnly, Category = "Gear")
-	TObjectPtr<UEquipment> Gear;
+	TObjectPtr<UInventory> Gear;
+	
+	
+	bool ShouldApplyItemFragment(const FSinInventoryEntry& Entry, ESinItemEffectApplicationPolicy Policy) const;
+	UFUNCTION()
+	void RefreshItemGrantedEffects();
+	
+	TMap<FGuid, TArray<FActiveGameplayEffectHandle>> AppliedEffectsByEntry;
+	TMap<FGuid, TArray<FGameplayAbilitySpecHandle>> GrantedAbilitiesByEntry;
+	
+	UFUNCTION()
+	void HandleInventoryEntryAdded(UInventory* Inventory,const FSinInventoryEntry& Entry);
+
+	//UFUNCTION()
+	//void HandleInventoryEntryRemoved(UInventory* Inventory, const FSinInventoryEntry& Entry);
+	UFUNCTION()
+	void HandleInventoryEntryRemoved(UInventory* Inventory, const FSinInventoryEntry& RemovedEntry);
+
+	UFUNCTION()
+	void HandleInventoryEntryChanged(UInventory* Inventory, const FSinInventoryEntry& OldEntry, const FSinInventoryEntry& Entry);
+
+	UFUNCTION()
+	void HandleInventoryContainerChanged(UInventory* Inventory,FGuid ContainerId);
+	
 	UFUNCTION(Category = "Gear")
 	void ItemAdded(UInventory* NewInventory, int32 Index, UGameItemBase* Item, int32 SrcIndex, UInventory* SrcInventory);
-
 	UFUNCTION(Category = "Gear")
 	void ItemRemoved(UInventory* NewInventory, int32 Index, UGameItemBase* Item, int32 SrcIndex, UInventory* SrcInventory);
+	
+	UFUNCTION(Category = "Gear")
+	void RemoveGrantedEffectsFragment(const USinItemFragment_GrantedEffects* Effects);
 
 	///** Lyra Systems //
 	//UFUNCTION(BlueprintCallable, Category = "GAS Input")

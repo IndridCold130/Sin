@@ -77,7 +77,7 @@ public:
 	void CloseActiveModalDialog();
 	
 	UFUNCTION(BlueprintCallable, Category="UI|Dialogs")
-	void ShowSplitStackDialogForSlotDrop(UInventory* SourceInventory, const FGuid& SourceEntryId, const FGuid& TargetContainerId, int32 TargetSlotIndex);
+	void ShowSplitStackDialogForSlotDrop(UInventory* SourceInventory, UInventory* TargetInventory, const FGuid& SourceEntryId, const FGuid& TargetContainerId, int32 TargetSlotIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void CloseMenu();

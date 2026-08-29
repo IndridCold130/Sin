@@ -33,7 +33,7 @@ void USinSplitStackDialog::InitFromContextMenu(USinItemContextMenu* ContextMenu)
 			&USinSplitStackDialog::HandleSliderChanged
 		);
 
-		Slider_Amount->SetMinValue(1.0f);
+		//Slider_Amount->SetMinValue(1.0f);
 		Slider_Amount->SetMaxValue(CurrentStack - 1);
 		Slider_Amount->SetValue(DeduceAmount);
 	}
@@ -42,14 +42,14 @@ void USinSplitStackDialog::InitFromContextMenu(USinItemContextMenu* ContextMenu)
 }
 
 // WHATTT
-void USinSplitStackDialog::InitFromDrag(UInventory* Inventory, const FGuid& IncomingSourceEntryId,
+void USinSplitStackDialog::InitFromDrag(UInventory* Source, UInventory* Target, const FGuid& IncomingSourceEntryId,
 	const FGuid& TargetContainerId, int32 TargetSlotIndex)
 {
-	if (!Inventory || !IncomingSourceEntryId.IsValid()){return;}
+	if (!Source || !IncomingSourceEntryId.IsValid()){return;}
 	
-	SourceInventory = Inventory; SourceEntryIdCached = IncomingSourceEntryId; SourceContainerId = FGuid(); 
+	SourceInventory = Source; TargetInventory = Target; SourceEntryIdCached = IncomingSourceEntryId; SourceContainerId = FGuid(); 
 	TargetContainerIdCached = TargetContainerId; TargetSlotIndexCached = TargetSlotIndex;
-	ItemEntry = Inventory->FindEntryById(IncomingSourceEntryId);
+	ItemEntry = Source->FindEntryById(IncomingSourceEntryId);
 	if (!ItemEntry || !ItemEntry->ItemDefinition) {return;}
 	
 	ItemDefinition = ItemEntry->ItemDefinition;
@@ -93,12 +93,11 @@ void USinSplitStackDialog::InitFromDrag(UInventory* Inventory, const FGuid& Inco
 			&USinSplitStackDialog::HandleSliderChanged
 		);
 		
-		Slider_Amount->SetMinValue(1.0f);
 		Slider_Amount->SetMaxValue(CurrentStack - 1);
 		Slider_Amount->SetValue(DeduceAmount);
 	}
 
-	SetSplitSource(Inventory,IncomingSourceEntryId,ItemEntry->ContainerId);
+	SetSplitSource(Source,IncomingSourceEntryId,ItemEntry->ContainerId);
 
 	TargetContainerIdForSplit = TargetContainerId;
 	TargetSlotIndexForSplit = TargetSlotIndex;
@@ -109,7 +108,7 @@ void USinSplitStackDialog::InitFromDrag(UInventory* Inventory, const FGuid& Inco
 
 void USinSplitStackDialog::HandleSliderChanged(float Value)
 {
-	DeduceAmount = Value;
+	DeduceAmount = FMath::Max(Value, 1);
 	RichText_DeducedAmount->SetText(USinCommonLibrary::MakeRichText(MaxStackStyleName,FText::AsNumber(DeduceAmount)));
 	//RichText_DeducedAmount->SetText(FText::AsNumber(DeduceAmount));
 }
@@ -141,12 +140,43 @@ void USinSplitStackDialog::SplitStack()
 		return;
 	}
 
-	SourceInventory->SplitEntryStackToSlot(
-		SourceEntryId,
-		DeduceAmount,
-		TargetContainerIdForSplit,
-		TargetSlotIndexForSplit
-	);
+	bool bSplitSucceeded;
 
+	// Same inventory
+	if (!TargetInventory || TargetInventory == SourceInventory)
+	{
+		bSplitSucceeded = SourceInventory->SplitEntryStackToSlot(
+			SourceEntryId,
+			DeduceAmount,
+			TargetContainerIdForSplit,
+			TargetSlotIndexForSplit
+		);
+	}
+	// Cross-inventory (player ↔ chest, etc.)
+	else
+	{
+		bSplitSucceeded = SourceInventory->SplitEntryStackToOtherInventory(
+			SourceEntryId,
+			DeduceAmount,
+			TargetInventory,
+			TargetContainerIdForSplit,
+			TargetSlotIndexForSplit
+		);
+	}
+
+	if (bSplitSucceeded)
+	{
+		const USinItemFragment_Display* Display = CachedDisplayFragment;
+
+		if (!Display && ItemDefinition)
+		{
+			Display = ItemDefinition->FindFragmentByClass<USinItemFragment_Display>();
+		}
+
+		if (Display && !Display->DropSound.IsNull())
+		{
+			USinCommonLibrary::PlaySoftSound2D(this, Display->DropSound);
+		}
+	}
 	RemoveFromParent();
 }

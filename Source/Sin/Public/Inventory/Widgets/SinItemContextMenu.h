@@ -64,4 +64,6 @@ protected:
 	void AddContextButton(const FText& Label, ESinItemContextAction Action);
 	UFUNCTION()
 	void HandleContextButtonClicked(ESinItemContextAction Action);
+	bool IsEntryInSpecializedContainer() const;
+	bool CanSmartEquipEntry() const;
 };

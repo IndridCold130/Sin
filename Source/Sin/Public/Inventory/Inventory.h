@@ -37,12 +37,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FOnSinInventoryEntryRemoved,
 	UInventory*, Inventory,
-	const FGuid&, EntryId
+	const FSinInventoryEntry&, RemovedEntry
 );
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
 	FOnSinInventoryEntryChanged,
 	UInventory*, Inventory,
-	const FSinInventoryEntry&, Entry
+	const FSinInventoryEntry&, OldEntry,
+	const FSinInventoryEntry&, NewEntry
 );
 // NEW INVENTORY SYSTEM
 
@@ -135,6 +137,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="Inventory|New")
 	bool FindFirstFreeSlotV2(const FGuid& ContainerId,int32& OutSlotIndex,USinItemDefinition* ItemDefinition = nullptr) const;
 	
+	UFUNCTION(Category="Inventory|New")
+	bool FindBestSlotForEntry(const FGuid& ContainerId, const FSinInventoryEntry& SourceEntry, int32& OutSlotIndex, bool bAllowSwap = false) const;
+	
+	UFUNCTION(Category="Inventory|New")
+	int32 PourEntryIntoContainer(const FGuid& EntryId, const FGuid& TargetContainerId);
+	
 	UFUNCTION(BlueprintPure, Category="Inventory|New")
 	bool DoesContainerAcceptItem(const FGuid& ContainerId, USinItemDefinition* ItemDefinition) const;
 	
@@ -226,8 +234,31 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Inventory|New")
 	bool SplitEntryStackToSlot(const FGuid& EntryId,int32 SplitAmount = -1, const FGuid& TargetContainerId = FGuid(), int32 TargetSlotIndex = -1);
 	
+	UFUNCTION(BlueprintCallable, Category="Inventory|New")
+	bool SplitEntryStackToOtherInventory(
+	const FGuid& EntryId,
+	int32 SplitAmount,
+	UInventory* TargetInventory,
+	const FGuid& TargetContainerId,
+	int32 TargetSlotIndex = -1);
+	
 	UFUNCTION(BlueprintPure, Category="Inventory|New")
 	bool DoesContainerAcceptItemAtSlot(const FGuid& ContainerId, int32 SlotIndex,USinItemDefinition* ItemDefinition) const;
+	
+	UPROPERTY(BlueprintReadOnly, Category="Inventory|Link")
+	TWeakObjectPtr<UInventory> LinkedInventory;
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|Link")
+	void SetLinkedInventory(UInventory* OtherInventory);
+	
+	UFUNCTION(BlueprintCallable, Category="Inventory|Link")
+	void ClearLinkedInventory();
+	
+	UFUNCTION(BlueprintPure, Category="Inventory|Link")
+	bool HasLinkedInventory() const { return LinkedInventory.IsValid(); }
+	
+	UFUNCTION()
+	bool TryDoubleClickEntry(const FGuid& EntryId);
 	// NEW SYSTEM
 
 	// CORE VARS

@@ -257,6 +257,8 @@ void ASinPlayerController::OnSinPawnReceived(APawn* PreviousPawn, APawn* NewPawn
 				SinEnhancedInput->BindNativeAction(InputConfig, TAG_Input_ActionSpecial, ETriggerEvent::Started, this, &ThisClass::Input_ActionSpecial);
 				SinEnhancedInput->BindNativeAction(InputConfig, TAG_Input_SwitchMainHand, ETriggerEvent::Started, this, &ThisClass::Input_SwapMainHand);
 				SinEnhancedInput->BindNativeAction(InputConfig, TAG_Input_SwitchOffHand, ETriggerEvent::Started, this, &ThisClass::Input_SwapOffHand);
+				SinEnhancedInput->BindNativeAction(InputConfig, TAG_Input_QuickSlotCycle, ETriggerEvent::Started, this, &ThisClass::Input_QuickSlotCycle);
+				SinEnhancedInput->BindNativeAction(InputConfig, TAG_Input_QuickSlotUse, ETriggerEvent::Started, this, &ThisClass::Input_QuickSlotUse);
 			}
 		}
 		else if (HasAuthority())
@@ -438,6 +440,22 @@ void ASinPlayerController::Input_SwapOffHand(const FInputActionValue& InputActio
 	Payload.EventTag = TAG_Input_SwitchOffHand;
 	FScopedPredictionWindow NewScopedWindow(AbilitySystem, true);
 	AbilitySystem->HandleGameplayEvent(TAG_Input_SwitchOffHand, &Payload);
+}
+
+void ASinPlayerController::Input_QuickSlotUse(const FInputActionInstance& InputActionValue)
+{
+	FGameplayEventData Payload;
+	Payload.EventTag = TAG_Input_QuickSlotUse;
+	FScopedPredictionWindow NewScopedWindow(AbilitySystem, true);
+	AbilitySystem->HandleGameplayEvent(TAG_Input_QuickSlotUse, &Payload);
+}
+
+void ASinPlayerController::Input_QuickSlotCycle(const FInputActionInstance& InputActionValue)
+{
+	FGameplayEventData Payload;
+	Payload.EventTag = TAG_Input_QuickSlotCycle;
+	FScopedPredictionWindow NewScopedWindow(AbilitySystem, true);
+	AbilitySystem->HandleGameplayEvent(TAG_Input_QuickSlotCycle, &Payload);
 }
 
 //void ASinPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

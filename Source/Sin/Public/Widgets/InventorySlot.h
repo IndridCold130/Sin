@@ -91,6 +91,7 @@ public:
 		virtual void NativeConstruct() override;
 protected:
 	void NativeOnInitialized() override;
+	virtual void NativePreConstruct() override;
 	virtual FReply NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnDragDetected(const FGeometry& MyGeometry, const FPointerEvent& PointerEvent, UDragDropOperation*& Operation) override;
@@ -99,6 +100,8 @@ protected:
 	//virtual void NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnFocusLost(const FFocusEvent& InFocusEvent) override;
+	
+	bool GetItemSounds( TSoftObjectPtr<USoundBase>& OutPickup,  TSoftObjectPtr<USoundBase>& OutDrop) const;
 	
 	//NEW SYSTEMZ
 public:
@@ -158,8 +161,8 @@ public:
 	TObjectPtr<USinEquipmentPanel> EquipmentPanel;
 	
 	UFUNCTION(BlueprintCallable, Category="Inventory|Equipment")
-	void InitEquipmentSlot(
-		USinEquipmentPanel* InEquipmentPanel,
+	void InitFixedContainerSlot(
+		UUserWidget* InOwningPanel,
 		const FGuid& InContainerId,
 		int32 InSlotIndex
 	);
@@ -177,6 +180,16 @@ public:
 	bool UsesNewInventorySystem() const;
 	
 	bool IsAnyContextMenuOpen() const;
+	
+	/** How long the mouse must stay over the slot before the tooltip appears (seconds). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Tooltip", meta = (ClampMin = "0.0"))
+	float TooltipDelay = 0.25f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Design")
+	FVector2D SlotSize = FVector2D(72.0f, 72.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Design")
+	FVector2D IconSize = FVector2D(64.0f, 64.0f);
 	
 	//NEW SYSTEMZ
 };

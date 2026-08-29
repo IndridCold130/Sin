@@ -58,6 +58,10 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Currency, "Item.Currency");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Currency_Crown, "Item.Currency.Crown");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment, "Item.Equipment");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Weapon, "Item.Equipment.Weapon");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Ammo,        "Item.Equipment.Ammo")
+UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Ammo_Arrow,  "Item.Equipment.Ammo.Arrow")
+UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Ammo_Bolt,   "Item.Equipment.Ammo.Bolt")
+UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Ammo_Bullet, "Item.Equipment.Ammo.Bullet")
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Weapon_MainHand, "Item.Equipment.Weapon.MainHand");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Weapon_OneHand, "Item.Equipment.Weapon.OneHand");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Weapon_OffHand, "Item.Equipment.Weapon.OffHand");
@@ -74,6 +78,7 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Undergarments_Panties, "Item.Equipment
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Undergarments_Top, "Item.Equipment.Undergarments.Top");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Undergarments_Hosiery, "Item.Equipment.Undergarments.Hosiery");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Utility, "Item.Equipment.Utility");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Equipment_Usable, "Item.Equipment.Usable");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Quest, "Item.Quest");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Craft, "Item.Craft");
 // ATTRIBUTES REDUX
@@ -282,6 +287,8 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Input_Jump, "Input.Jump");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Input_DrawWeapon, "Input.DrawWeapon");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Input_Crouch, "Input.Crouch");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Input_Guard, "Input.Guard");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Input_QuickSlotUse, "Input.QuickSlotUse");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Input_QuickSlotCycle, "Input.QuickSlotCycle");
 
 // MENU INPUT
 UE_DEFINE_GAMEPLAY_TAG(TAG_Menu_Escape, "Menu.Escape");
