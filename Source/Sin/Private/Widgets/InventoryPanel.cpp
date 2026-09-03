@@ -18,24 +18,17 @@
 
 UInventorySlot* UInventoryPanel::NavigateCachedSlot(EInventoryNavigationDirection Direction, bool bWrap,
 	bool bSkipEmptySlots)
-{
-	if (!SlotGrid)
-	{
-		return nullptr;
-	}
+ {
+	if (!SlotGrid){return nullptr;}
 
 	const int32 ChildCount = SlotGrid->GetChildrenCount();
 
 	if (ChildCount <= 0)
-	{
-		if (CachedSlot)
-		{
-			CachedSlot->OnHovered(false);
-		}
-
+		{if (CachedSlot)
+			{CachedSlot->OnHovered(false);}
 		CachedSlot = nullptr;
 		return nullptr;
-	}
+		}
 
 	TArray<UInventorySlot*> NavigableSlots;
 	NavigableSlots.Reserve(ChildCount);
@@ -48,7 +41,17 @@ UInventorySlot* UInventoryPanel::NavigateCachedSlot(EInventoryNavigationDirectio
 			continue;
 		}
 
-		if (bSkipEmptySlots && !SlotWidget->SlottedItem)
+		bool bIsEmpty = false;
+		if (bUseNewInventorySystem)
+		{
+			bIsEmpty = !SlotWidget->EntryId.IsValid();
+		}
+		else
+		{
+			bIsEmpty = (SlotWidget->SlottedItem == nullptr);
+		}
+
+		if (bSkipEmptySlots && bIsEmpty)
 		{
 			continue;
 		}
@@ -586,6 +589,7 @@ void UInventoryPanel::ManageInventorySlotsV2(const FGuid& ContainerId)
 	}
 
 	SlotGrid->ClearChildren();
+	CachedSlot = nullptr;
 
 	const FSinInventoryContainerState* ContainerState =
 		DataHolder->FindContainerStateById(ContainerId);
@@ -595,12 +599,100 @@ void UInventoryPanel::ManageInventorySlotsV2(const FGuid& ContainerId)
 		return;
 	}
 
+	auto CreateSlotWidget = [this, ContainerId, ContainerState](int32 SlotIndex, const FSinInventoryEntry* Entry) -> UInventorySlot*
+	{
+		UInventorySlot* LocalSlot = CreateWidget<UInventorySlot>(this, InventorySlotClass);
+		if (!LocalSlot)
+		{
+			return nullptr;
+		}
+
+		LocalSlot->SlotIndex = SlotIndex;
+		LocalSlot->MasterPanel = this;
+		LocalSlot->ContainerId = ContainerId;
+		LocalSlot->SlotType = ContainerState->ContainerTag;
+		LocalSlot->ApplyVisualSettings(SlotSize, IconSize);
+		LocalSlot->SetPadding(SlotPadding);
+
+		if (Entry)
+		{
+			LocalSlot->RefreshSlotV2(*Entry);
+		}
+		else
+		{
+			LocalSlot->ClearSlotV2();
+		}
+
+		return LocalSlot;
+	};
+
+	auto AddToGrid = [this](UInventorySlot* LocalSlot, int32 GridIndex)
+	{
+		if (UUniformGridSlot* GridSlot = SlotGrid->AddChildToUniformGrid(
+			LocalSlot,
+			GridIndex / InventoryDivider,
+			GridIndex % InventoryDivider))
+		{
+			GridSlot->SetHorizontalAlignment(HAlign_Fill);
+			GridSlot->SetVerticalAlignment(VAlign_Fill);
+		}
+	};
+
+	if (bItemList)
+	{
+		TArray<const FSinInventoryEntry*> Occupied;
+		for (const FSinInventoryEntry& Entry : DataHolder->ItemInventory)
+		{
+			if (Entry.ContainerId == ContainerId && Entry.ItemDefinition)
+			{
+				Occupied.Add(&Entry);
+			}
+		}
+
+		Occupied.Sort([](const FSinInventoryEntry& A, const FSinInventoryEntry& B)
+		{
+			return A.SlotIndex < B.SlotIndex;
+		});
+
+		int32 VisibleIndex = 0;
+
+		for (const FSinInventoryEntry* Entry : Occupied)
+		{
+			if (UInventorySlot* LocalSlot = CreateSlotWidget(Entry->SlotIndex, Entry))
+			{
+				AddToGrid(LocalSlot, VisibleIndex);
+
+				if (CachedSlot == nullptr)
+				{
+					CachedSlot = LocalSlot;
+					CachedSlot->OnHovered(true);
+				}
+
+				++VisibleIndex;
+			}
+		}
+
+		while (VisibleIndex < MinVisibleSlots)
+		{
+			if (UInventorySlot* EmptySlot = CreateSlotWidget(INDEX_NONE, nullptr))
+			{
+				AddToGrid(EmptySlot, VisibleIndex);
+				++VisibleIndex;
+			}
+			else
+			{
+				break;
+			}
+		}
+
+		return;
+	}
+
 	int32 SlotsToCreate = ContainerState->SlotCount;
 
 	if (ContainerState->bBottomless)
 	{
 		int32 HighestUsedSlot = INDEX_NONE;
-
 		for (const FSinInventoryEntry& Entry : DataHolder->ItemInventory)
 		{
 			if (Entry.ContainerId == ContainerId)
@@ -608,47 +700,12 @@ void UInventoryPanel::ManageInventorySlotsV2(const FGuid& ContainerId)
 				HighestUsedSlot = FMath::Max(HighestUsedSlot, Entry.SlotIndex);
 			}
 		}
-
-		const int32 NeededSlots = HighestUsedSlot + 1;
-
-		SlotsToCreate = FMath::Max(
-			ContainerState->MinVisibleSlots,
-			NeededSlots
-		);
+		SlotsToCreate = FMath::Max(ContainerState->MinVisibleSlots, HighestUsedSlot + 1);
 	}
 
 	for (int32 i = 0; i < SlotsToCreate; ++i)
 	{
-		UInventorySlot* LocalSlot = CreateWidget<UInventorySlot>(this, InventorySlotClass);
-		if (!LocalSlot)
-		{
-			continue;
-		}
-
-		LocalSlot->SlotIndex = i;
-		LocalSlot->MasterPanel = this;
-
-		// New exact container identity.
-		LocalSlot->ContainerId = ContainerId;
-
-		// Optional: keep this if old/current code still uses SlotType as the container rules tag.
-		LocalSlot->SlotType = ContainerState->ContainerTag;
-
-		LocalSlot->ApplyVisualSettings(SlotSize, IconSize);
-
-		if (UUniformGridSlot* GridSlot = SlotGrid->AddChildToUniformGrid(
-			LocalSlot,
-			i / InventoryDivider,
-			i % InventoryDivider))
-		{
-			GridSlot->SetHorizontalAlignment(HAlign_Fill);
-			GridSlot->SetVerticalAlignment(VAlign_Fill);
-		}
-
-		LocalSlot->SetPadding(SlotPadding);
-
 		const FSinInventoryEntry* MatchingEntry = nullptr;
-
 		for (const FSinInventoryEntry& Entry : DataHolder->ItemInventory)
 		{
 			if (Entry.ContainerId == ContainerId && Entry.SlotIndex == i)
@@ -658,13 +715,9 @@ void UInventoryPanel::ManageInventorySlotsV2(const FGuid& ContainerId)
 			}
 		}
 
-		if (MatchingEntry)
+		if (UInventorySlot* LocalSlot = CreateSlotWidget(i, MatchingEntry))
 		{
-			LocalSlot->RefreshSlotV2(*MatchingEntry);
-		}
-		else
-		{
-			LocalSlot->ClearSlotV2();
+			AddToGrid(LocalSlot, i);
 		}
 	}
 }

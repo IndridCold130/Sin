@@ -257,7 +257,7 @@ public:
 	UFUNCTION(BlueprintPure, Category="Inventory|Link")
 	bool HasLinkedInventory() const { return LinkedInventory.IsValid(); }
 	
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	bool TryDoubleClickEntry(const FGuid& EntryId);
 	// NEW SYSTEM
 

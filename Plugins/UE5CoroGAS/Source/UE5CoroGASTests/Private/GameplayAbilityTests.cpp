@@ -31,25 +31,29 @@
 
 #include "GASTestWorld.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/EngineVersionComparison.h"
+#include "Tasks/GameplayTask_WaitDelay.h"
 #include "UE5CoroGASTestGameplayAbility.h"
 
 using namespace UE5Coro::Private::Test;
 
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGameplayAbilityTestNonInstanced,
                                  "UE5Coro.GAS.GameplayAbility.NonInstanced",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
+#endif
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGameplayAbilityTestPerActor,
                                  "UE5Coro.GAS.GameplayAbility.PerActor",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGameplayAbilityTestPerExecution,
                                  "UE5Coro.GAS.GameplayAbility.PerExecution",
-                                 EAutomationTestFlags::ApplicationContextMask |
+                                 EAutomationTestFlags_ApplicationContextMask |
                                  EAutomationTestFlags::HighPriority |
                                  EAutomationTestFlags::ProductFilter)
 
@@ -58,7 +62,11 @@ namespace
 void DoTest(FAutomationTestBase& Test,
             EGameplayAbilityInstancingPolicy::Type Policy)
 {
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 	bool bInstanced = Policy != EGameplayAbilityInstancingPolicy::NonInstanced;
+#else
+	constexpr bool bInstanced = true;
+#endif
 	auto* CDO = GetMutableDefault<UUE5CoroGASTestGameplayAbility>();
 	UUE5CoroGASTestGameplayAbility::SetInstancingPolicy(Policy);
 	int& State = UUE5CoroGASTestGameplayAbility::State;
@@ -115,14 +123,31 @@ void DoTest(FAutomationTestBase& Test,
 		World.Run(UUE5CoroGASTestGameplayAbility::StaticClass());
 	} // Force cancel by destroying the world
 	Test.TestEqual(TEXT("Canceled"), State, 2);
+
+	if (bInstanced)
+	{
+		{
+			FGASTestWorld World;
+			UUE5CoroGASTestGameplayAbility::Reset();
+			World.Run(UUE5CoroGASTestGameplayAbility::StaticClass());
+			FTestHelper::PumpGameThread(World, [&] { return State == 4; });
+			Test.TestTrue(TEXT("Active task"),
+			              !!TObjectIterator<UGameplayTask_WaitDelay>());
+		} // Force cancel by destroying the world while the task is active
+		Test.TestFalse(TEXT("Task destroyed"),
+		               !!TObjectIterator<UGameplayTask_WaitDelay>());
+		Test.TestEqual(TEXT("Canceled with task"), State, 7);
+	}
 }
 }
 
+#if UE_VERSION_OLDER_THAN(5, 5, 0)
 bool FGameplayAbilityTestNonInstanced::RunTest(const FString& Parameters)
 {
 	DoTest(*this, EGameplayAbilityInstancingPolicy::NonInstanced);
 	return true;
 }
+#endif
 
 bool FGameplayAbilityTestPerActor::RunTest(const FString& Parameters)
 {

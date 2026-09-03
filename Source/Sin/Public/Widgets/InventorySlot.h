@@ -89,6 +89,9 @@ public:
 			UWidgetAnimation* Incompatible;
 
 		virtual void NativeConstruct() override;
+	
+	UFUNCTION(BlueprintCallable)
+	bool GetItemSounds( TSoftObjectPtr<USoundBase>& OutPickup,  TSoftObjectPtr<USoundBase>& OutDrop) const;
 protected:
 	void NativeOnInitialized() override;
 	virtual void NativePreConstruct() override;
@@ -100,8 +103,6 @@ protected:
 	//virtual void NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnFocusLost(const FFocusEvent& InFocusEvent) override;
-	
-	bool GetItemSounds( TSoftObjectPtr<USoundBase>& OutPickup,  TSoftObjectPtr<USoundBase>& OutDrop) const;
 	
 	//NEW SYSTEMZ
 public:

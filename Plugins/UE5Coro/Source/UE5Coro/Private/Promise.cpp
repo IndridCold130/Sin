@@ -41,6 +41,27 @@ std::atomic<int> UE5Coro::Private::GLastDebugID = -1; // -1 = no coroutines yet
 thread_local FPromise* UE5Coro::Private::GCurrentPromise = nullptr;
 thread_local bool UE5Coro::Private::GDestroyedEarly = false;
 
+namespace
+{
+struct FCoroutineScope
+{
+	FPromise* Promise;
+	FPromise* PreviousPromise;
+
+	explicit FCoroutineScope(FPromise* Promise)
+		: Promise(Promise),
+		  PreviousPromise(std::exchange(GCurrentPromise, Promise))
+	{
+	}
+
+	~FCoroutineScope()
+	{
+		verifyf(std::exchange(GCurrentPromise, PreviousPromise) == Promise,
+		        TEXT("Internal error: coroutine tracking derailed"));
+	}
+};
+}
+
 bool FPromiseExtras::IsComplete() const
 {
 	return Completed->Wait(0, true);
@@ -75,19 +96,23 @@ FPromise::~FPromise()
 	GDestroyedEarly = false;
 
 	// The coroutine is considered completed NOW
-	Extras->Completed->Trigger();
+	auto* ReturnValuePtr = std::exchange(Extras->ReturnValuePtr, nullptr);
+	Extras->Completed->Trigger(); // This prevents new continuations
+	auto Completions = std::move(OnCompleted);
 	Extras->Lock.unlock();
 
-	for (auto& Fn : OnCompleted)
-		Fn(Extras->ReturnValuePtr);
-	Extras->ReturnValuePtr = nullptr;
+	for (auto& Fn : Completions)
+		Fn(ReturnValuePtr);
 }
 
 void FPromise::ThreadSafeDestroy()
 {
 	auto Handle = stdcoro::coroutine_handle<FPromise>::from_promise(*this);
 	GDestroyedEarly = IsEarlyDestroy();
-	Handle.destroy(); // counts as delete this;
+	{
+		FCoroutineScope Scope(this);
+		Handle.destroy(); // counts as delete this;
+	}
 	checkf(!GDestroyedEarly,
 	       TEXT("Internal error: early destroy flag not reset"));
 }
@@ -124,15 +149,6 @@ void FPromise::Resume(bool bBypassCancellationHolds)
 	checkf(this, TEXT("Corruption")); // Still useful on some compilers
 	checkf(!Extras->IsComplete(),
 	       TEXT("Attempting to resume completed coroutine"));
-	auto* CallerPromise = GCurrentPromise;
-	GCurrentPromise = this;
-	ON_SCOPE_EXIT
-	{
-		// Coroutine resumption might result in `this` having been freed already
-		checkf(GCurrentPromise == this,
-		       TEXT("Internal error: coroutine resume tracking derailed"));
-		GCurrentPromise = CallerPromise;
-	};
 
 	// Self-destruct instead of resuming if a cancellation was received.
 	// As an exception, the latent action manager destroying the latent action
@@ -140,7 +156,10 @@ void FPromise::Resume(bool bBypassCancellationHolds)
 	if (UNLIKELY(ShouldCancel(bBypassCancellationHolds)))
 		ThreadSafeDestroy();
 	else
+	{
+		FCoroutineScope Scope(this);
 		stdcoro::coroutine_handle<FPromise>::from_promise(*this).resume();
+	}
 }
 
 void FPromise::ResumeFast()
@@ -148,9 +167,7 @@ void FPromise::ResumeFast()
 	checkf(!Extras->IsComplete() && !ShouldCancel(true),
 	       TEXT("Internal error: Fast resume preconditions not met"));
 	// If this is a FLatentPromise, !LF_Detached is also assumed
-	auto* CallerPromise = GCurrentPromise;
-	GCurrentPromise = this;
-	ON_SCOPE_EXIT { GCurrentPromise = CallerPromise; };
+	FCoroutineScope Scope(this);
 	stdcoro::coroutine_handle<FPromise>::from_promise(*this).resume();
 }
 
@@ -160,13 +177,17 @@ void FPromise::AddContinuation(std::function<void(void*)> Fn)
 	checkf(!Extras->Lock.try_lock(), TEXT("Internal error: lock not held"));
 	checkf(Fn, TEXT("Internal error: adding empty function as continuation"));
 
-	OnCompleted.Add(std::move(Fn));
+	OnCompleted.push_back(std::move(Fn));
 }
 
 void FPromise::unhandled_exception()
 {
 #if PLATFORM_EXCEPTIONS_DISABLED
-	check(!"Exceptions are not supported");
+	// Hitting this can be a result of the coroutine itself invoking undefined
+	// behavior, e.g., by using a bad pointer.
+	// On Windows, SEH exceptions can end up here if C++ exceptions are disabled.
+	// If this hinders debugging, feel free to remove it!
+	checkSlow(!"Unhandled exception from coroutine!");
 #else
 	bUnhandledException = true;
 	throw;
