@@ -53,6 +53,10 @@ public:
 		UPROPERTY(BlueprintReadOnly)
 			UInventorySlot* CachedSlot;
 	
+	/** Quickloot / item-list: always show at least this many slots. Occupied first, empties after. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory|New", meta=(ClampMin="0"))
+		int32 MinVisibleSlots = 4;
+	
 		//UFUNCTION(BlueprintCallable, Category = "Inventory|Navigation")
 		//UInventorySlot* NavigateCachedSlot(EInventoryNavigationDirection Direction, bool bWrap = true, bool bSkipEmptySlots = true);
 	

@@ -7,6 +7,7 @@
 #include "Lootable.generated.h"
 
 class UInventory;
+class USinLootContainerSettings;
 
 /**
  * 
@@ -38,4 +39,12 @@ public:
 
 		FString GetToolTipInfo();
 		virtual FString GetToolTipInfo_Implementation();
+	
+		UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Loot")
+		TObjectPtr<USinLootContainerSettings> LootSettings;
+
+		UPROPERTY(SaveGame)
+		bool bHasGeneratedLoot = false;
+
+		void EnsureLootGenerated();
 };

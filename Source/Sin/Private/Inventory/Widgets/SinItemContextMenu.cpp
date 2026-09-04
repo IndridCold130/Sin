@@ -27,16 +27,30 @@ void USinItemContextMenu::InitContextMenu(UInventoryPanel* InOwnerPanel, UInvent
 	SetIsFocusable(true);
 	SetKeyboardFocus();
 	SetFocus();
+
 	OwnerPanel = InOwnerPanel;
 	SourceSlot = InSourceSlot;
-	SourceInventory = OwnerPanel->DataHolder; if (!SourceInventory){return;}
+
+	if (!SourceSlot)
+	{
+		return;
+	}
+
 	SourceSlot->EndTooltipHover();
-	
+
+	SourceInventory = SourceSlot->GetOwningInventory();
+	if (!SourceInventory)
+	{
+		return;
+	}
+
 	Entry = SourceInventory->FindEntryById(SourceSlot->EntryId);
-	if (!Entry || !Entry->ItemDefinition){return;}
-	
+	if (!Entry || !Entry->ItemDefinition)
+	{
+		return;
+	}
+
 	ItemDefinition = Entry->ItemDefinition;
-	
 	BuildDefaultButtons();
 }
 
@@ -106,6 +120,13 @@ void USinItemContextMenu::HandleContextButtonClicked(ESinItemContextAction Actio
 		EntryId = Entry->EntryId;
 	}
 
+	TSoftObjectPtr<USoundBase> PickupSound;
+	TSoftObjectPtr<USoundBase> DropSound;
+	if (SourceSlot)
+	{
+		SourceSlot->GetItemSounds(PickupSound, DropSound);
+	}
+
 	bool bDidSomething = false;
 
 	switch (Action)
@@ -142,6 +163,26 @@ void USinItemContextMenu::HandleContextButtonClicked(ESinItemContextAction Actio
 	case ESinItemContextAction::Close:
 	default:
 		break;
+	}
+
+	if (Action == ESinItemContextAction::Equip
+		|| Action == ESinItemContextAction::Unequip)
+	{
+		if (bDidSomething)
+		{
+			if (!DropSound.IsNull())
+			{
+				USinCommonLibrary::PlaySoftSound2D(this, DropSound);
+			}
+		}
+		else if (!ActionFailedSound.IsNull())
+		{
+			USinCommonLibrary::PlaySoftSound2D(this, ActionFailedSound);
+		}
+	}
+	else if (!DefaultClickSound.IsNull())
+	{
+		USinCommonLibrary::PlaySoftSound2D(this, DefaultClickSound);
 	}
 
 	if (SourceSlot && SourceSlot->ContextAnchor)

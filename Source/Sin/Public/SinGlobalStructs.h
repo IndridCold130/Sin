@@ -23,8 +23,6 @@ class USin_GAS_Buff;
 
 #define LOCTEXT_NAMESPACE "MyNamespace"
 
-#define LOCTEXT(InKey, InTextLiteral) FInternationalization::ForUseOnlyByLocMacroAndGraphNodeTextLiterals_CreateText(TEXT(InTextLiteral), TEXT(LOCTEXT_NAMESPACE), TEXT(InKey))
-
 UENUM(BlueprintType)
 enum class EPerkType : uint8
 {
@@ -380,7 +378,7 @@ struct FSpawnDataRow : public FTableRowBase
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NPC")
-		FText Name = LOCTEXT("Generic Female", "Generic Female");
+		FText Name = FText::FromString(TEXT("Generic Female"));
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NPC")
 		TSoftClassPtr <ASinCharacter> CharacterClass;

@@ -94,63 +94,56 @@ FReply UInventorySlot::NativeOnMouseButtonDown(
 	const FGeometry& InGeometry,
 	const FPointerEvent& InMouseEvent)
 {
-	if (MasterPanel && MasterPanel->bUseNewInventorySystem)
+	if (UsesNewInventorySystem()
+		&& InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 	{
-		if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+		UInventory* Inventory = GetOwningInventory();
+
+		if (InMouseEvent.IsShiftDown())
 		{
-			// Shift + RMB = quick split
-			if (InMouseEvent.IsShiftDown())
+			if (!Inventory || !EntryId.IsValid() || !ContainerId.IsValid())
 			{
-				UInventory* Inventory = MasterPanel->DataHolder;
-				if (!Inventory || !EntryId.IsValid() || !ContainerId.IsValid())
-				{
-					return FReply::Handled();
-				}
-
-				const FSinInventoryEntry* Entry = Inventory->FindEntryById(EntryId);
-				if (!Entry || Entry->StackCount <= 1)
-				{
-					return FReply::Handled();
-				}
-
-				int32 FreeSlot = INDEX_NONE;
-				if (!Inventory->FindFirstFreeSlotV2(ContainerId, FreeSlot))
-				{
-					return FReply::Handled();
-				}
-
-				const int32 SplitAmount = Entry->StackCount / 2;
-				
-				const bool bSplitSucceeded = Inventory->SplitEntryStackToSlot(
-					EntryId,
-					SplitAmount,
-					ContainerId,
-					FreeSlot
-				);
-				
-				if (bSplitSucceeded)
-				{
-					TSoftObjectPtr<USoundBase> PickupSound;
-					TSoftObjectPtr<USoundBase> DropSound;
-
-					if (GetItemSounds(PickupSound, DropSound) && !DropSound.IsNull())
-					{
-						USinCommonLibrary::PlaySoftSound2D(this, DropSound);
-					}
-				}
-
 				return FReply::Handled();
 			}
 
-			// Regular RMB = context menu
-			if (EntryId.IsValid())
+			const FSinInventoryEntry* Entry = Inventory->FindEntryById(EntryId);
+			if (!Entry || Entry->StackCount <= 1)
 			{
-				//MasterPanel->TryShowItemContextMenuFromSlot(this);
-				ContextAnchor->Open(true);
 				return FReply::Handled();
 			}
+
+			int32 FreeSlot = INDEX_NONE;
+			if (!Inventory->FindFirstFreeSlotV2(ContainerId, FreeSlot))
+			{
+				return FReply::Handled();
+			}
+
+			const bool bSplitSucceeded = Inventory->SplitEntryStackToSlot(
+				EntryId,
+				Entry->StackCount / 2,
+				ContainerId,
+				FreeSlot);
+
+			if (bSplitSucceeded)
+			{
+				TSoftObjectPtr<USoundBase> PickupSound;
+				TSoftObjectPtr<USoundBase> DropSound;
+				if (GetItemSounds(PickupSound, DropSound) && !DropSound.IsNull())
+				{
+					USinCommonLibrary::PlaySoftSound2D(this, DropSound);
+				}
+			}
+
+			return FReply::Handled();
+		}
+
+		if (EntryId.IsValid() && ContextAnchor)
+		{
+			ContextAnchor->Open(true);
+			return FReply::Handled();
 		}
 	}
+
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 

@@ -1,14 +1,30 @@
+// Copyright 2019-2026 pafuhana1213. All Rights Reserved.
+
 #include "AnimGraphNode_KawaiiPhysics.h"
 
+#include "Subsystems/AssetEditorSubsystem.h"
+#include "AssetToolsModule.h"
 #include "DetailCategoryBuilder.h"
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
+#include "KawaiiPhysicsBoneConstraintsDataAsset.h"
 #include "KawaiiPhysicsLimitsDataAsset.h"
+#include "Widgets/Input/SButton.h"
+#include "Framework/Notifications/NotificationManager.h"
 #include "Selection.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Widgets/Notifications/SNotificationList.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Dialogs/DlgPickAssetPath.h"
 #include "Kismet2/CompilerResultsLog.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
+#include "Widgets/Layout/SSeparator.h"
+
+#if !UE_VERSION_OLDER_THAN(5, 6, 0)
+#include "Animation/AnimInstance.h"
+#endif
+
+#include UE_INLINE_GENERATED_CPP_BY_NAME(AnimGraphNode_KawaiiPhysics)
 
 #define LOCTEXT_NAMESPACE "KawaiiPhysics"
 
@@ -34,32 +50,78 @@ FText UAnimGraphNode_KawaiiPhysics::GetNodeTitle(ENodeTitleType::Type TitleType)
 	// @TODO: the bone can be altered in the property editor, so we have to 
 	//        choose to mark this dirty when that happens for this to properly work
 	//if (!CachedNodeTitles.IsTitleCached(TitleType, this))
+
 	FFormatNamedArguments Args;
 	Args.Add(TEXT("ControllerDescription"), GetControllerDescription());
 	Args.Add(TEXT("RootBoneName"), FText::FromName(Node.RootBone.BoneName));
+	Args.Add(TEXT("Tag"), FText::FromString(Node.KawaiiPhysicsTag.ToString()));
 
 	// FText::Format() is slow, so we cache this to save on performance
 	if (TitleType == ENodeTitleType::ListView || TitleType == ENodeTitleType::MenuTitle)
 	{
-		CachedNodeTitles.SetCachedTitle(TitleType, FText::Format(
-			                                LOCTEXT("AnimGraphNode_KawaiiPhysics_ListTitle",
-			                                        "{ControllerDescription} - Root: {RootBoneName}"), Args), this);
+		const FText Title = Node.KawaiiPhysicsTag.IsValid()
+			                    ? FText::Format(
+				                    LOCTEXT("AnimGraphNode_KawaiiPhysics_ListTitle",
+				                            "{ControllerDescription} - Root: {RootBoneName} - Tag: {Tag}"), Args)
+			                    : FText::Format(
+				                    LOCTEXT("AnimGraphNode_KawaiiPhysics_ListTitle",
+				                            "{ControllerDescription} - Root: {RootBoneName}"), Args);
+
+		CachedNodeTitles.SetCachedTitle(TitleType, Title, this);
 	}
 	else
 	{
-		CachedNodeTitles.SetCachedTitle(TitleType, FText::Format(
-			                                LOCTEXT("AnimGraphNode_KawaiiPhysics_Title",
-			                                        "{ControllerDescription}\nRoot: {RootBoneName} "), Args), this);
+		const FText Title = Node.KawaiiPhysicsTag.IsValid()
+			                    ? FText::Format(
+				                    LOCTEXT("AnimGraphNode_KawaiiPhysics_Title",
+				                            "{ControllerDescription}\nRoot: {RootBoneName}\nTag:  {Tag} "), Args)
+			                    : FText::Format(
+				                    LOCTEXT("AnimGraphNode_KawaiiPhysics_Title",
+				                            "{ControllerDescription}\nRoot: {RootBoneName}"), Args);
+
+		CachedNodeTitles.SetCachedTitle(TitleType, Title, this);
 	}
 	return CachedNodeTitles[TitleType];
+}
+
+void UAnimGraphNode_KawaiiPhysics::EnsureUniqueCollisionGuids()
+{
+	// コリジョン配列のGuidを一意化する（複製/貼り付けでGuidごとコピーされ重複しうるため）。
+	TSet<FGuid> SeenGuids;
+	auto Dedup = [&SeenGuids](auto& Limits)
+	{
+		for (auto& Limit : Limits)
+		{
+			if (!Limit.Guid.IsValid() || SeenGuids.Contains(Limit.Guid))
+			{
+				Limit.Guid = FGuid::NewGuid();
+			}
+			SeenGuids.Add(Limit.Guid);
+		}
+	};
+	Dedup(Node.SphericalLimits);
+	Dedup(Node.CapsuleLimits);
+	Dedup(Node.BoxLimits);
+	Dedup(Node.PlanarLimits);
 }
 
 void UAnimGraphNode_KawaiiPhysics::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
+	// 複製/貼り付け等でGuidが重複しうるため一意化する（EditModeのGuid削除が誤削除しないように）
+	EnsureUniqueCollisionGuids();
+
 	Node.ModifyBones.Empty();
 	ReconstructNode();
+}
+
+void UAnimGraphNode_KawaiiPhysics::PostLoad()
+{
+	Super::PostLoad();
+
+	// 本修正以前に複製された古いデータが重複Guidを持つ場合に備え、ロード時にも一意化する
+	EnsureUniqueCollisionGuids();
 }
 
 FEditorModeID UAnimGraphNode_KawaiiPhysics::GetEditorMode() const
@@ -98,9 +160,9 @@ void UAnimGraphNode_KawaiiPhysics::CopyNodeDataToPreviewNode(FAnimNode_Base* Ani
 	KawaiiPhysics->ExcludeBones = Node.ExcludeBones;
 	KawaiiPhysics->AdditionalRootBones = Node.AdditionalRootBones;
 	KawaiiPhysics->TargetFramerate = Node.TargetFramerate;
-	KawaiiPhysics->OverrideTargetFramerate = Node.OverrideTargetFramerate;
 
 	// Physics Settings
+	KawaiiPhysics->PhysicsSettings = Node.PhysicsSettings;
 	KawaiiPhysics->DampingCurveData = Node.DampingCurveData;
 	KawaiiPhysics->WorldDampingLocationCurveData = Node.WorldDampingLocationCurveData;
 	KawaiiPhysics->WorldDampingRotationCurveData = Node.WorldDampingRotationCurveData;
@@ -113,22 +175,46 @@ void UAnimGraphNode_KawaiiPhysics::CopyNodeDataToPreviewNode(FAnimNode_Base* Ani
 
 	// DummyBone
 	KawaiiPhysics->DummyBoneLength = Node.DummyBoneLength;
+	KawaiiPhysics->BoneSubdivisionCount = Node.BoneSubdivisionCount;
+	KawaiiPhysics->bBoneSubdivisionCollisionOnly = Node.bBoneSubdivisionCollisionOnly;
+	KawaiiPhysics->bBoneSubdivisionDensifyByRadius = Node.bBoneSubdivisionDensifyByRadius;
+	KawaiiPhysics->BoneConstraintSubdivisionCount = Node.BoneConstraintSubdivisionCount;
+	KawaiiPhysics->BoneConstraintSubdivisionFeedbackScale = Node.BoneConstraintSubdivisionFeedbackScale;
 	KawaiiPhysics->BoneForwardAxis = Node.BoneForwardAxis;
 
 	// Limits
 	KawaiiPhysics->SphericalLimits = Node.SphericalLimits;
 	KawaiiPhysics->CapsuleLimits = Node.CapsuleLimits;
+	KawaiiPhysics->BoxLimits = Node.BoxLimits;
 	KawaiiPhysics->PlanarLimits = Node.PlanarLimits;
 	KawaiiPhysics->LimitsDataAsset = Node.LimitsDataAsset;
+	KawaiiPhysics->PhysicsAssetForLimits = Node.PhysicsAssetForLimits;
+
+	// Shared Collision
+	if (KawaiiPhysics->bSharedCollisionSource != Node.bSharedCollisionSource ||
+		KawaiiPhysics->bUseSharedCollision != Node.bUseSharedCollision ||
+		KawaiiPhysics->SharedCollisionGroupTag != Node.SharedCollisionGroupTag)
+	{
+		KawaiiPhysics->RequestSharedCollisionReinit();
+	}
+	KawaiiPhysics->bSharedCollisionSource = Node.bSharedCollisionSource;
+	KawaiiPhysics->bUseSharedCollision = Node.bUseSharedCollision;
+	KawaiiPhysics->SharedCollisionGroupTag = Node.SharedCollisionGroupTag;
 
 	// ExternalForce
 	KawaiiPhysics->Gravity = Node.Gravity;
+	KawaiiPhysics->bUseLegacyGravity = Node.bUseLegacyGravity;
+	KawaiiPhysics->bUseDefaultGravityZProjectSetting = Node.bUseDefaultGravityZProjectSetting;
+	KawaiiPhysics->bUseWorldSpaceGravity = Node.bUseWorldSpaceGravity;
+	KawaiiPhysics->SimpleExternalForce = Node.SimpleExternalForce;
+	KawaiiPhysics->bUseWorldSpaceSimpleExternalForce = Node.bUseWorldSpaceSimpleExternalForce;
 	KawaiiPhysics->ExternalForces = Node.ExternalForces;
 	KawaiiPhysics->CustomExternalForces = Node.CustomExternalForces;
 
 	// Wind
 	KawaiiPhysics->bEnableWind = Node.bEnableWind;
 	KawaiiPhysics->WindScale = Node.WindScale;
+	KawaiiPhysics->WindDirectionNoiseAngle = Node.WindDirectionNoiseAngle;
 
 	// BoneConstraint
 	KawaiiPhysics->BoneConstraintGlobalComplianceType = Node.BoneConstraintGlobalComplianceType;
@@ -137,6 +223,13 @@ void UAnimGraphNode_KawaiiPhysics::CopyNodeDataToPreviewNode(FAnimNode_Base* Ani
 	KawaiiPhysics->bAutoAddChildDummyBoneConstraint = Node.bAutoAddChildDummyBoneConstraint;
 	KawaiiPhysics->BoneConstraints = Node.BoneConstraints;
 	KawaiiPhysics->BoneConstraintsDataAsset = Node.BoneConstraintsDataAsset;
+
+	// SimulationSpace
+	KawaiiPhysics->SimulationSpace = Node.SimulationSpace;
+	KawaiiPhysics->SimulationBaseBone = Node.SimulationBaseBone;
+
+	// SyncBone
+	KawaiiPhysics->SyncBones = Node.SyncBones;
 
 	// Reset for sync without compile
 	KawaiiPhysics->ModifyBones.Empty();
@@ -149,22 +242,40 @@ void UAnimGraphNode_KawaiiPhysics::CustomizeDetailTools(IDetailLayoutBuilder& De
 
 	WidgetRow
 	[
-		SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot()
-		.AutoWidth()
+		SNew(SUniformGridPanel)
+		.SlotPadding(FMargin(2, 0, 2, 0))
+		+ SUniformGridPanel::Slot(0, 0)
 		[
 			SNew(SButton)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.OnClicked_Lambda([this]()
-			             {
-				             this->ExportLimitsDataAsset();
-				             return FReply::Handled();
-			             })
-				.Content()
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			.OnClicked_Lambda([this]()
+			{
+				this->ExportLimitsDataAsset();
+				return FReply::Handled();
+			})
+			.Content()
 			[
 				SNew(STextBlock)
-				.Text(FText::FromString(TEXT("Export Limits Data Asset")))
+				.Text(FText::FromString(TEXT("Export Limits")))
+				.Font(FSlateFontInfo(FCoreStyle::GetDefaultFont(), 9))
+			]
+		]
+		+ SUniformGridPanel::Slot(1, 0)
+		[
+			SNew(SButton)
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			.OnClicked_Lambda([this]()
+			{
+				this->ExportBoneConstraintsDataAsset();
+				return FReply::Handled();
+			})
+			.Content()
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(TEXT("Export BoneConstraints")))
+				.Font(FSlateFontInfo(FCoreStyle::GetDefaultFont(), 9))
 			]
 		]
 	];
@@ -176,192 +287,137 @@ void UAnimGraphNode_KawaiiPhysics::CustomizeDetailDebugVisualizations(IDetailLay
 	FDetailWidgetRow& WidgetRow = ViewportCategory.AddCustomRow(
 		LOCTEXT("ToggleDebugVisualizationButtonRow", "DebugVisualization"));
 
+	auto CreateDebugButton = [&](const FString& Label, bool& DebugFlag)
+	{
+		return SNew(SButton)
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			.OnClicked_Lambda([&]()
+			{
+				DebugFlag = !DebugFlag;
+				return FReply::Handled();
+			})
+			.ButtonColorAndOpacity_Lambda([&]()
+			{
+				return DebugFlag
+					       ? FAppStyle::Get().GetSlateColor("Colors.AccentGreen")
+					       : FAppStyle::Get().GetSlateColor("Colors.AccentRed");
+			})
+			.Content()
+			[
+				SNew(STextBlock)
+					.Text(FText::FromString(Label))
+					.Font(FSlateFontInfo(FCoreStyle::GetDefaultFont(), 9))
+			];
+	};
+	
+	auto CreateCategorySeparator = [&](const FString& Label, const int32 FontSize = 9)
+	{
+		return SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.FillWidth(0.01f)
+			.VAlign(VAlign_Center)
+			[
+				SNew(SSeparator)
+			]
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.Padding(FMargin(2.f, 0.f))
+			.VAlign(VAlign_Center)
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(Label))
+				.Font(FSlateFontInfo(FCoreStyle::GetDefaultFont(), FontSize))
+			]
+			+ SHorizontalBox::Slot()
+			.FillWidth(0.9f)
+			.VAlign(VAlign_Center)
+			[
+				SNew(SSeparator)
+			];
+	};
+
 	WidgetRow
 	[
-		SNew(SUniformGridPanel)
-		.SlotPadding(FMargin(2, 0, 2, 0))
-		// Show/Hide Bones button.
-		+ SUniformGridPanel::Slot(0, 0)
+		SNew(SVerticalBox)
+
+		// Common
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(FMargin(0.f, 2.f))
 		[
-			SNew(SButton)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.OnClicked_Lambda([this]()
-			             {
-				             this->bEnableDebugDrawBone = !this->bEnableDebugDrawBone;
-				             return FReply::Handled();
-			             })
-				.ButtonColorAndOpacity_Lambda([this]()
-			             {
-				             return this->bEnableDebugDrawBone
-					                    ? FAppStyle::Get().GetSlateColor("Colors.AccentGreen")
-					                    : FAppStyle::Get().GetSlateColor("Colors.AccentRed");
-			             })
-				.Content()
+			CreateCategorySeparator(TEXT("Common"))
+		]
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			SNew(SUniformGridPanel)
+			+ SUniformGridPanel::Slot(0, 0)
 			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return LOCTEXT("ShowBoneText", "Bone"); })
+				CreateDebugButton(TEXT("Bone"), bEnableDebugDrawBone)
+			]
+			+ SUniformGridPanel::Slot(1, 0)
+			[
+				CreateDebugButton(TEXT("Length Rate"), bEnableDebugBoneLengthRate)
+			]
+			+ SUniformGridPanel::Slot(2, 0)
+			[
+				CreateDebugButton(TEXT("Limit Angle") , bEnableDebugDrawLimitAngle)
 			]
 		]
-		// Show/Hide LengthRate button.
-		+ SUniformGridPanel::Slot(1, 0)
+
+		// Limits
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(FMargin(0.f, 2.f))
 		[
-			SNew(SButton)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.OnClicked_Lambda([this]()
-			             {
-				             this->bEnableDebugBoneLengthRate = !this->bEnableDebugBoneLengthRate;
-				             return FReply::Handled();
-			             })
-				.ButtonColorAndOpacity_Lambda([this]()
-			             {
-				             return this->bEnableDebugBoneLengthRate
-					                    ? FAppStyle::Get().GetSlateColor("Colors.AccentGreen")
-					                    : FAppStyle::Get().GetSlateColor("Colors.AccentRed");
-			             })
-				.Content()
+			CreateCategorySeparator(TEXT("Collision"))
+		]
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			SNew(SUniformGridPanel)
+			+ SUniformGridPanel::Slot(0, 0)
 			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return LOCTEXT("ShowLengthRateText", "Length Rate"); })
+				CreateDebugButton(TEXT("Sphere"),  bEnableDebugDrawSphereLimit)
+			]
+			+ SUniformGridPanel::Slot(1, 0)
+			[
+				CreateDebugButton(TEXT("Capsule"),  bEnableDebugDrawCapsuleLimit)
+			]
+			+ SUniformGridPanel::Slot(2, 0)
+			[
+				CreateDebugButton(TEXT("Box"), bEnableDebugDrawBoxLimit)
+			]
+			+ SUniformGridPanel::Slot(0, 1)
+			[
+				CreateDebugButton(TEXT("Plane"),  bEnableDebugDrawPlanerLimit)
 			]
 		]
-		// Show/Hide AngleLimit button.
-		+ SUniformGridPanel::Slot(2, 0)
+
+		// Advanced
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(FMargin(0.f, 2.f))
 		[
-			SNew(SButton)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.OnClicked_Lambda([this]()
-			             {
-				             this->bEnableDebugDrawLimitAngle = !this->bEnableDebugDrawLimitAngle;
-				             return FReply::Handled();
-			             })
-				.ButtonColorAndOpacity_Lambda([this]()
-			             {
-				             return this->bEnableDebugDrawLimitAngle
-					                    ? FAppStyle::Get().GetSlateColor("Colors.AccentGreen")
-					                    : FAppStyle::Get().GetSlateColor("Colors.AccentRed");
-			             })
-				.Content()
-			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return LOCTEXT("ShowLimitAngleText", "Limit Angle"); })
-			]
+			CreateCategorySeparator(TEXT("Advanced"))
 		]
-		// Show/Hide SphereLimit button.
-		+ SUniformGridPanel::Slot(3, 0)
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(FMargin(0.f, 2.f))
 		[
-			SNew(SButton)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.OnClicked_Lambda([this]()
-			             {
-				             this->bEnableDebugDrawSphereLimit = !this->bEnableDebugDrawSphereLimit;
-				             return FReply::Handled();
-			             })
-				.ButtonColorAndOpacity_Lambda([this]()
-			             {
-				             return this->bEnableDebugDrawSphereLimit
-					                    ? FAppStyle::Get().GetSlateColor("Colors.AccentGreen")
-					                    : FAppStyle::Get().GetSlateColor("Colors.AccentRed");
-			             })
-				.Content()
+			SNew(SUniformGridPanel)
+			+ SUniformGridPanel::Slot(0, 0)
 			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return LOCTEXT("ShowSphereLimitText", "Sphere Limit"); })
+				CreateDebugButton(TEXT("Sync Bone"), bEnableDebugDrawSyncBone)
 			]
-		]
-		// Show/Hide CapsuleLimit button.
-		+ SUniformGridPanel::Slot(0, 1)
-		[
-			SNew(SButton)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.OnClicked_Lambda([this]()
-			             {
-				             this->bEnableDebugDrawCapsuleLimit = !this->bEnableDebugDrawCapsuleLimit;
-				             return FReply::Handled();
-			             })
-				.ButtonColorAndOpacity_Lambda([this]()
-			             {
-				             return this->bEnableDebugDrawCapsuleLimit
-					                    ? FAppStyle::Get().GetSlateColor("Colors.AccentGreen")
-					                    : FAppStyle::Get().GetSlateColor("Colors.AccentRed");
-			             })
-				.Content()
+			+ SUniformGridPanel::Slot(1, 0)
 			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return LOCTEXT("ShowCapsuleLimitText", "Capsule Limit"); })
+				CreateDebugButton(TEXT("Bone Constraint"),  bEnableDebugDrawBoneConstraint)
 			]
-		]
-		// Show/Hide PlanerLimit button.
-		+ SUniformGridPanel::Slot(1, 1)
-		[
-			SNew(SButton)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.OnClicked_Lambda([this]()
-			             {
-				             this->bEnableDebugDrawPlanerLimit = !this->bEnableDebugDrawPlanerLimit;
-				             return FReply::Handled();
-			             })
-				.ButtonColorAndOpacity_Lambda([this]()
-			             {
-				             return this->bEnableDebugDrawPlanerLimit
-					                    ? FAppStyle::Get().GetSlateColor("Colors.AccentGreen")
-					                    : FAppStyle::Get().GetSlateColor("Colors.AccentRed");
-			             })
-				.Content()
+			+ SUniformGridPanel::Slot(2, 0)
 			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return LOCTEXT("ShowPlanerLimitText", "Planer Limit"); })
-			]
-		]
-		// Show/Hide BoneConstraint button.
-		+ SUniformGridPanel::Slot(2, 1)
-		[
-			SNew(SButton)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.OnClicked_Lambda([this]()
-			             {
-				             this->bEnableDebugDrawBoneConstraint = !this->bEnableDebugDrawBoneConstraint;
-				             return FReply::Handled();
-			             })
-				.ButtonColorAndOpacity_Lambda([this]()
-			             {
-				             return this->bEnableDebugDrawBoneConstraint
-					                    ? FAppStyle::Get().GetSlateColor("Colors.AccentGreen")
-					                    : FAppStyle::Get().GetSlateColor("Colors.AccentRed");
-			             })
-				.Content()
-			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return LOCTEXT("ShowBoneConstraintText", "Bone Constraint"); })
-			]
-		]
-		// Show/Hide ExternalForce button.
-		+ SUniformGridPanel::Slot(3, 1)
-		[
-			SNew(SButton)
-				.HAlign(HAlign_Center)
-				.VAlign(VAlign_Center)
-				.OnClicked_Lambda([this]()
-			             {
-				             this->bEnableDebugDrawExternalForce = !this->bEnableDebugDrawExternalForce;
-				             return FReply::Handled();
-			             })
-				.ButtonColorAndOpacity_Lambda([this]()
-			             {
-				             return this->bEnableDebugDrawExternalForce
-					                    ? FAppStyle::Get().GetSlateColor("Colors.AccentGreen")
-					                    : FAppStyle::Get().GetSlateColor("Colors.AccentRed");
-			             })
-				.Content()
-			[
-				SNew(STextBlock)
-				.Text_Lambda([this]() { return LOCTEXT("ShowExternalForceText", "External Force"); })
+				CreateDebugButton(TEXT("External Force"), bEnableDebugDrawExternalForce)
 			]
 		]
 	];
@@ -374,32 +430,46 @@ void UAnimGraphNode_KawaiiPhysics::CustomizeDetails(IDetailLayoutBuilder& Detail
 	CustomizeDetailTools(DetailBuilder);
 	CustomizeDetailDebugVisualizations(DetailBuilder);
 
-	// Force order of details panel catagories - Must set order for all of them as any that are edited automatically move to the top.
+	// Force order of details panel categories - Must set order for all of them as any that are edited automatically move to the top.
+	auto CategorySorter = [](const TMap<FName, IDetailCategoryBuilder*>& Categories)
 	{
-		uint32 SortOrder = 0;
+		int32 Order = 0;
+		auto SafeSetOrder = [&Categories, &Order](const FName& CategoryName)
+		{
+			if (IDetailCategoryBuilder* const* Builder = Categories.Find(CategoryName))
+			{
+				(*Builder)->SetSortOrder(Order++);
+			}
+		};
 
 		// Tools, Debug
-		DetailBuilder.EditCategory("Kawaii Physics Tools").SetSortOrder(SortOrder++);
-		DetailBuilder.EditCategory("Debug Visualization").SetSortOrder(SortOrder++);
-		DetailBuilder.EditCategory("Functions").SetSortOrder(SortOrder++);
+		SafeSetOrder(FName("Kawaii Physics Tools"));
+		SafeSetOrder(FName("Debug Visualization"));
+		SafeSetOrder(FName("Functions"));
 
 		// Basic
-		DetailBuilder.EditCategory("Bones").SetSortOrder(SortOrder++);
-		DetailBuilder.EditCategory("Physics Settings").SetSortOrder(SortOrder++);
-		DetailBuilder.EditCategory("Physics Settings Advanced").SetSortOrder(SortOrder++);
+		SafeSetOrder(FName("Bones"));
+		SafeSetOrder(FName("Bones|Bone Subdivision"));
+		SafeSetOrder(FName("Physics Settings"));
+		SafeSetOrder(FName("Physics Settings|Curves"));
 
 		// Limits
-		DetailBuilder.EditCategory("Limits").SetSortOrder(SortOrder++);
-		DetailBuilder.EditCategory("Bone Constraint (Experimental)").SetSortOrder(SortOrder++);
+		SafeSetOrder(FName("Limits"));
+		SafeSetOrder(FName("Limits|Bone Constraint"));
+		SafeSetOrder(FName("Limits|Shared Collision"));
+		SafeSetOrder(FName("Limits|World Collision"));
 
-		// Other
-		DetailBuilder.EditCategory("World Collision").SetSortOrder(SortOrder++);
-		DetailBuilder.EditCategory("ExternalForce").SetSortOrder(SortOrder++);
+		// Force
+		SafeSetOrder(FName("Force"));
+		SafeSetOrder(FName("Force|External Force"));
+		SafeSetOrder(FName("Force|Sync Bone"));
 
 		// AnimNode
-		DetailBuilder.EditCategory("Tag").SetSortOrder(SortOrder++);
-		DetailBuilder.EditCategory("Alpha").SetSortOrder(SortOrder++);
-	}
+		SafeSetOrder(FName("Tag"));
+		SafeSetOrder(FName("Alpha"));
+	};
+
+	DetailBuilder.SortCategories(CategorySorter);
 }
 
 struct FKawaiiPhysicsVersion
@@ -433,62 +503,91 @@ void UAnimGraphNode_KawaiiPhysics::Serialize(FArchive& Ar)
 	Super::Serialize(Ar);
 
 	Ar.UsingCustomVersion(FKawaiiPhysicsVersion::GUID);
+}
 
-	if (Ar.CustomVer(FKawaiiPhysicsVersion::GUID) < FKawaiiPhysicsVersion::UseRuntimeFloatCurve)
+void UAnimGraphNode_KawaiiPhysics::CreateExportDataAssetPath(FString& PackageName, const FString& DefaultSuffix) const
+{
+	FString AssetName;
+	const FString AnimBlueprintPath = GetAnimBlueprint()->GetPackage()->GetName();
+	const FAssetToolsModule& AssetToolsModule = FModuleManager::GetModuleChecked<FAssetToolsModule>("AssetTools");
+	AssetToolsModule.Get().CreateUniqueAssetName(AnimBlueprintPath, DefaultSuffix, PackageName, AssetName);
+}
+
+UPackage* UAnimGraphNode_KawaiiPhysics::CreateDataAssetPackage(const FString& DialogTitle, const FString& DefaultSuffix,
+                                                               FString& AssetName) const
+{
+	FString PackageName;
+	CreateExportDataAssetPath(PackageName, DefaultSuffix);
+
+	const TSharedRef<SDlgPickAssetPath> NewAssetDlg =
+		SNew(SDlgPickAssetPath)
+		.Title(FText::FromString(DialogTitle))
+		.DefaultAssetPath(FText::FromString(PackageName));
+
+	if (NewAssetDlg->ShowModal() == EAppReturnType::Cancel)
 	{
-		Node.DampingCurveData.ExternalCurve = Node.DampingCurve_DEPRECATED;
-		Node.WorldDampingLocationCurveData.ExternalCurve = Node.WorldDampingLocationCurve_DEPRECATED;
-		Node.WorldDampingRotationCurveData.ExternalCurve = Node.WorldDampingRotationCurve_DEPRECATED;
-		Node.StiffnessCurveData.ExternalCurve = Node.StiffnessCurve_DEPRECATED;
-		Node.RadiusCurveData.ExternalCurve = Node.RadiusCurve_DEPRECATED;
-		Node.LimitAngleCurveData.ExternalCurve = Node.LimitAngleCurve_DEPRECATED;
+		return nullptr;
 	}
+
+	const FString PackagePath(NewAssetDlg->GetFullAssetPath().ToString());
+	AssetName = NewAssetDlg->GetAssetName().ToString();
+
+	return CreatePackage(*PackagePath);
+}
+
+void UAnimGraphNode_KawaiiPhysics::ShowExportAssetNotification(UObject* NewAsset,
+                                                               FText NotificationText)
+{
+	FNotificationInfo NotificationInfo(NotificationText);
+	NotificationInfo.ExpireDuration = 5.0f;
+	NotificationInfo.Hyperlink = FSimpleDelegate::CreateLambda([NewAsset]()
+	{
+		GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(NewAsset);
+	});
+	NotificationInfo.HyperlinkText = LOCTEXT("OpenCreatedAsset", "Open Created Asset");
+
+	TSharedPtr<SNotificationItem> NotificationItem = FSlateNotificationManager::Get().AddNotification(
+		NotificationInfo);
+	NotificationItem->SetCompletionState(SNotificationItem::CS_Success);
 }
 
 void UAnimGraphNode_KawaiiPhysics::ExportLimitsDataAsset()
 {
-	const FString DefaultAsset = FPackageName::GetLongPackagePath(GetOutermost()->GetName()) + TEXT("/") + GetName() +
-		TEXT("_Collision");
-
-	const TSharedRef<SDlgPickAssetPath> NewAssetDlg =
-		SNew(SDlgPickAssetPath)
-			.Title(LOCTEXT("NewDataAssetDialogTitle", "Choose Location for Collision Data Asset"))
-			.DefaultAssetPath(FText::FromString(DefaultAsset));
-
-	if (NewAssetDlg->ShowModal() == EAppReturnType::Cancel)
+	FString AssetName;
+	UPackage* Package = CreateDataAssetPackage(
+		TEXT("Choose Location for Collision Data Asset"), TEXT("_Collision"), AssetName);
+	if (!Package)
 	{
 		return;
 	}
 
-	const FString Package(NewAssetDlg->GetFullAssetPath().ToString());
-	const FString Name(NewAssetDlg->GetAssetName().ToString());
-
-	UPackage* Pkg = CreatePackage(*Package);
-
 	if (UKawaiiPhysicsLimitsDataAsset* NewDataAsset =
-		NewObject<UKawaiiPhysicsLimitsDataAsset>(Pkg, UKawaiiPhysicsLimitsDataAsset::StaticClass(), FName(Name),
-		                                         RF_Public | RF_Standalone))
+		NewObject<UKawaiiPhysicsLimitsDataAsset>(Package, UKawaiiPhysicsLimitsDataAsset::StaticClass(),
+		                                         FName(AssetName), RF_Public | RF_Standalone))
 	{
+		// look for a valid component in the object being debugged,
+		// we might be set to something other than the preview.
+		if (UObject* ObjectBeingDebugged = GetAnimBlueprint()->GetObjectBeingDebugged())
+		{
+			if (const UAnimInstance* InstanceBeingDebugged = Cast<UAnimInstance>(ObjectBeingDebugged))
+			{
+				NewDataAsset->Skeleton = InstanceBeingDebugged->CurrentSkeleton;
+			}
+		}
+
 		// copy data
-		NewDataAsset->SphericalLimitsData.SetNum(Node.SphericalLimits.Num());
-		for (int32 i = 0; i < Node.SphericalLimits.Num(); i++)
+		auto CopyLimits = [&](auto& DataLimits, auto& SourceLimits)
 		{
-			NewDataAsset->SphericalLimitsData[i].Update(&Node.SphericalLimits[i]);
-		}
-
-		NewDataAsset->CapsuleLimitsData.SetNum(Node.CapsuleLimits.Num());
-		for (int32 i = 0; i < Node.CapsuleLimits.Num(); i++)
-		{
-			NewDataAsset->CapsuleLimitsData[i].Update(&Node.CapsuleLimits[i]);
-		}
-
-		NewDataAsset->PlanarLimitsData.SetNum(Node.PlanarLimits.Num());
-		for (int32 i = 0; i < Node.PlanarLimits.Num(); i++)
-		{
-			NewDataAsset->PlanarLimitsData[i].Update(&Node.PlanarLimits[i]);
-		}
-
-		NewDataAsset->Sync();
+			DataLimits = SourceLimits;
+			for (auto& DataLimit : DataLimits)
+			{
+				DataLimit.SourceType = ECollisionSourceType::DataAsset;
+			}
+		};
+		CopyLimits(NewDataAsset->SphericalLimits, Node.SphericalLimits);
+		CopyLimits(NewDataAsset->CapsuleLimits, Node.CapsuleLimits);
+		CopyLimits(NewDataAsset->BoxLimits, Node.BoxLimits);
+		CopyLimits(NewDataAsset->PlanarLimits, Node.PlanarLimits);
 
 		// select new asset
 		USelection* SelectionSet = GEditor->GetSelectedObjects();
@@ -496,7 +595,61 @@ void UAnimGraphNode_KawaiiPhysics::ExportLimitsDataAsset()
 		SelectionSet->Select(NewDataAsset);
 
 		FAssetRegistryModule::AssetCreated(NewDataAsset);
-		Pkg->MarkPackageDirty();
+		Package->MarkPackageDirty();
+
+		// Add Notification
+		FText NotificationText = FText::Format(
+			LOCTEXT("ExportedLimitsDataAsset", "Exposted Limits Data Asset: {0}"), FText::FromString(AssetName));
+		ShowExportAssetNotification(NewDataAsset, NotificationText);
+	}
+}
+
+void UAnimGraphNode_KawaiiPhysics::ExportBoneConstraintsDataAsset()
+{
+	FString AssetName;
+	UPackage* Package = CreateDataAssetPackage(
+		TEXT("Choose Location for BoneConstraints Data Asset"), TEXT("_BoneConstraint"), AssetName);
+	if (!Package)
+	{
+		return;
+	}
+
+	if (UKawaiiPhysicsBoneConstraintsDataAsset* NewDataAsset =
+		NewObject<UKawaiiPhysicsBoneConstraintsDataAsset>(
+			Package, UKawaiiPhysicsBoneConstraintsDataAsset::StaticClass(),
+			FName(AssetName), RF_Public | RF_Standalone))
+	{
+		// look for a valid component in the object being debugged,
+		// we might be set to something other than the preview.
+		if (UObject* ObjectBeingDebugged = GetAnimBlueprint()->GetObjectBeingDebugged())
+		{
+			if (const UAnimInstance* InstanceBeingDebugged = Cast<UAnimInstance>(ObjectBeingDebugged))
+			{
+				NewDataAsset->PreviewSkeleton = InstanceBeingDebugged->CurrentSkeleton;
+				NewDataAsset->UpdatePreviewBoneList();
+			}
+		}
+
+		// copy data
+		NewDataAsset->BoneConstraintsData.SetNum(Node.BoneConstraints.Num());
+		for (int32 i = 0; i < Node.BoneConstraints.Num(); i++)
+		{
+			NewDataAsset->BoneConstraintsData[i].Update(Node.BoneConstraints[i]);
+		}
+
+		// select new asset
+		USelection* SelectionSet = GEditor->GetSelectedObjects();
+		SelectionSet->DeselectAll();
+		SelectionSet->Select(NewDataAsset);
+
+		FAssetRegistryModule::AssetCreated(NewDataAsset);
+		Package->MarkPackageDirty();
+
+		// Add Notification
+		FText NotificationText = FText::Format(
+			LOCTEXT("ExportedBoneConstraintsDataAsset", "Exposted BoneConstraints Data Asset: {0}"),
+			FText::FromString(AssetName));
+		ShowExportAssetNotification(NewDataAsset, NotificationText);
 	}
 }
 

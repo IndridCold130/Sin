@@ -1,10 +1,9 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Copyright 2019-2026 pafuhana1213. All Rights Reserved.
 
 #pragma once
 
-#include "CoreMinimal.h"
 #include "AnimNode_KawaiiPhysics.h"
-#include "KawaiiPhysicsExternalForce.h"
+#include "ExternalForces/KawaiiPhysicsExternalForce.h"
 #include "Animation/AnimNodeReference.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "KawaiiPhysicsLibrary.generated.h"
@@ -47,7 +46,8 @@ struct FKawaiiPhysicsReference : public FAnimNodeReference
 };
 
 /**
- * Exposes operations to be performed on a blend space anim node.
+ * KawaiiPhysics アニメーションノードに対する Blueprint 操作を公開する関数ライブラリ。
+ * Blueprint function library exposing operations on a KawaiiPhysics anim node.
  */
 UCLASS()
 class KAWAIIPHYSICS_API UKawaiiPhysicsLibrary : public UBlueprintFunctionLibrary
@@ -72,6 +72,16 @@ public:
 		Result = (ConversionResult == EAnimNodeReferenceConversionResult::Succeeded);
 	}
 
+	/** Collect KawaiiPhysics Node References from AnimInstance(ABP)  */
+	static bool CollectKawaiiPhysicsNodes(TArray<FKawaiiPhysicsReference>& Nodes,
+	                                      UAnimInstance* AnimInstance, const FGameplayTagContainer& FilterTags,
+	                                      bool bFilterExactMatch);
+
+	/** Collect KawaiiPhysics Node References from SkeletalMeshComponent  */
+	static bool CollectKawaiiPhysicsNodes(TArray<FKawaiiPhysicsReference>& Nodes,
+	                                      USkeletalMeshComponent* MeshComp, const FGameplayTagContainer& FilterTags,
+	                                      bool bFilterExactMatch);
+
 	/** ResetDynamics */
 	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
 	static FKawaiiPhysicsReference ResetDynamics(const FKawaiiPhysicsReference& KawaiiPhysics);
@@ -92,14 +102,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
 	static TArray<FName> GetExcludeBoneNames(const FKawaiiPhysicsReference& KawaiiPhysics);
 
-	/** Set PhysicsSettings */
+	// PhysicsSettings
 	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
 	static FKawaiiPhysicsReference SetPhysicsSettings(const FKawaiiPhysicsReference& KawaiiPhysics,
 	                                                  UPARAM(ref) FKawaiiPhysicsSettings& PhysicsSettings)
 	{
 		KAWAIIPHYSICS_VALUE_SETTER(FKawaiiPhysicsSettings, PhysicsSettings);
 	}
-
+	
 	UFUNCTION(BlueprintPure, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
 	static FKawaiiPhysicsSettings GetPhysicsSettings(const FKawaiiPhysicsReference& KawaiiPhysics)
 	{
@@ -111,13 +121,87 @@ public:
 	static FKawaiiPhysicsReference SetDummyBoneLength(const FKawaiiPhysicsReference& KawaiiPhysics,
 	                                                  float DummyBoneLength)
 	{
-		KAWAIIPHYSICS_VALUE_SETTER(float, DummyBoneLength);
+		KawaiiPhysics.CallAnimNodeFunction<FAnimNode_KawaiiPhysics>(
+			TEXT("SetDummyBoneLength"),
+			[DummyBoneLength](FAnimNode_KawaiiPhysics& InKawaiiPhysics) {
+				InKawaiiPhysics.DummyBoneLength = FMath::Max(DummyBoneLength, 0.0f);
+				InKawaiiPhysics.RequestModifyBonesReinit();
+			});
+		return KawaiiPhysics;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
 	static float GetDummyBoneLength(const FKawaiiPhysicsReference& KawaiiPhysics)
 	{
 		KAWAIIPHYSICS_VALUE_GETTER(float, DummyBoneLength);
+	}
+
+	// BoneSubdivisionCount
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static FKawaiiPhysicsReference SetBoneSubdivisionCount(const FKawaiiPhysicsReference& KawaiiPhysics,
+	                                                       int32 BoneSubdivisionCount)
+	{
+		KawaiiPhysics.CallAnimNodeFunction<FAnimNode_KawaiiPhysics>(
+			TEXT("SetBoneSubdivisionCount"),
+			[BoneSubdivisionCount](FAnimNode_KawaiiPhysics& InKawaiiPhysics) {
+				InKawaiiPhysics.BoneSubdivisionCount = FMath::Clamp(BoneSubdivisionCount, 0, 10);
+				InKawaiiPhysics.RequestModifyBonesReinit();
+			});
+		return KawaiiPhysics;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static int32 GetBoneSubdivisionCount(const FKawaiiPhysicsReference& KawaiiPhysics)
+	{
+		KAWAIIPHYSICS_VALUE_GETTER(int32, BoneSubdivisionCount);
+	}
+
+	// BoneSubdivisionCollisionOnly
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static FKawaiiPhysicsReference SetBoneSubdivisionCollisionOnly(const FKawaiiPhysicsReference& KawaiiPhysics,
+	                                                               bool bBoneSubdivisionCollisionOnly)
+	{
+		KAWAIIPHYSICS_VALUE_SETTER(bool, bBoneSubdivisionCollisionOnly);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static bool GetBoneSubdivisionCollisionOnly(const FKawaiiPhysicsReference& KawaiiPhysics)
+	{
+		KAWAIIPHYSICS_VALUE_GETTER(bool, bBoneSubdivisionCollisionOnly);
+	}
+
+	// BoneConstraintSubdivisionCount
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static FKawaiiPhysicsReference SetBoneConstraintSubdivisionCount(const FKawaiiPhysicsReference& KawaiiPhysics,
+	                                                                 int32 BoneConstraintSubdivisionCount)
+	{
+		KawaiiPhysics.CallAnimNodeFunction<FAnimNode_KawaiiPhysics>(
+			TEXT("SetBoneConstraintSubdivisionCount"),
+			[BoneConstraintSubdivisionCount](FAnimNode_KawaiiPhysics& InKawaiiPhysics) {
+				InKawaiiPhysics.BoneConstraintSubdivisionCount = FMath::Clamp(BoneConstraintSubdivisionCount, 0, 10);
+				InKawaiiPhysics.RequestModifyBonesReinit();
+			});
+		return KawaiiPhysics;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static int32 GetBoneConstraintSubdivisionCount(const FKawaiiPhysicsReference& KawaiiPhysics)
+	{
+		KAWAIIPHYSICS_VALUE_GETTER(int32, BoneConstraintSubdivisionCount);
+	}
+
+	// BoneConstraintSubdivisionFeedbackScale（ランタイムスカラー: トポロジ不変のためreinit不要 / runtime scalar, no reinit）
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static FKawaiiPhysicsReference SetBoneConstraintSubdivisionFeedbackScale(const FKawaiiPhysicsReference& KawaiiPhysics,
+	                                                                         float BoneConstraintSubdivisionFeedbackScale)
+	{
+		KAWAIIPHYSICS_VALUE_SETTER(float, BoneConstraintSubdivisionFeedbackScale);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static float GetBoneConstraintSubdivisionFeedbackScale(const FKawaiiPhysicsReference& KawaiiPhysics)
+	{
+		KAWAIIPHYSICS_VALUE_GETTER(float, BoneConstraintSubdivisionFeedbackScale);
 	}
 
 	/** TeleportDistanceThreshold */
@@ -234,14 +318,113 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics",
 		meta=(BlueprintThreadSafe, ExpandEnumAsExecs = "ExecResult"))
 	static FKawaiiPhysicsReference AddExternalForceWithExecResult(EKawaiiPhysicsAccessExternalForceResult& ExecResult,
-	                                                const FKawaiiPhysicsReference& KawaiiPhysics,
-	                                                FInstancedStruct& ExternalForce, UObject* Owner);
+	                                                              const FKawaiiPhysicsReference& KawaiiPhysics,
+	                                                              FInstancedStruct& ExternalForce, UObject* Owner);
 
 	/** Add ExternalForce */
 	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
 	static bool AddExternalForce(const FKawaiiPhysicsReference& KawaiiPhysics,
-	                             FInstancedStruct& ExternalForce, UObject* Owner);
+	                             FInstancedStruct& ExternalForce, UObject* Owner, bool bIsOneShot = false);
 
+	/** Add ExternalForces to SkeletalMeshComponent */
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static bool AddExternalForcesToComponent(USkeletalMeshComponent* MeshComp,
+	                                         UPARAM(ref) TArray<FInstancedStruct>& ExternalForces, UObject* Owner,
+	                                         UPARAM(ref) FGameplayTagContainer& FilterTags,
+	                                         bool bFilterExactMatch = false,
+	                                         bool bIsOneShot = false);
+
+	/** Remove ExternalForces from SkeletalMeshComponent (by Owner) */
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static bool RemoveExternalForcesFromComponent(USkeletalMeshComponent* MeshComp, UObject* Owner,
+	                                              UPARAM(ref) FGameplayTagContainer& FilterTags,
+	                                              bool bFilterExactMatch = false);
+
+	/**
+	 * Set alpha (input) to all KawaiiPhysics nodes in the component (and linked/post-process instances).
+	 * This is intended for AnimNotifyState usage.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static bool SetAlphaToComponent(USkeletalMeshComponent* MeshComp, float Alpha,
+	                                UPARAM(ref) FGameplayTagContainer& FilterTags,
+	                                bool bFilterExactMatch = false);
+
+	/** Get current alpha (input) from the first matched KawaiiPhysics node in the component. */
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics", meta=(BlueprintThreadSafe))
+	static bool GetAlphaFromComponent(USkeletalMeshComponent* MeshComp, float& OutAlpha,
+	                                  UPARAM(ref) FGameplayTagContainer& FilterTags,
+	                                  bool bFilterExactMatch = false);
+
+	// --- Shared Collision ---
+
+	/**
+	 * このノードをコリジョン共有のSourceにするかを設定
+	 * Set whether this node acts as a shared collision source
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics|Shared Collision", meta=(BlueprintThreadSafe))
+	static FKawaiiPhysicsReference SetSharedCollisionSource(const FKawaiiPhysicsReference& KawaiiPhysics,
+	                                                        bool bSharedCollisionSource)
+	{
+		KawaiiPhysics.CallAnimNodeFunction<FAnimNode_KawaiiPhysics>(
+			TEXT("SetbSharedCollisionSource"),
+			[bSharedCollisionSource](FAnimNode_KawaiiPhysics& InKawaiiPhysics) {
+				InKawaiiPhysics.bSharedCollisionSource = bSharedCollisionSource;
+				InKawaiiPhysics.RequestSharedCollisionReinit();
+			});
+		return KawaiiPhysics;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Kawaii Physics|Shared Collision", meta=(BlueprintThreadSafe))
+	static bool GetSharedCollisionSource(const FKawaiiPhysicsReference& KawaiiPhysics)
+	{
+		KAWAIIPHYSICS_VALUE_GETTER(bool, bSharedCollisionSource);
+	}
+
+	/**
+	 * 他のKawaiiPhysicsから共有コリジョンを使用するかを設定
+	 * Set whether to use shared collision limits from other KawaiiPhysics nodes
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics|Shared Collision", meta=(BlueprintThreadSafe))
+	static FKawaiiPhysicsReference SetUseSharedCollision(const FKawaiiPhysicsReference& KawaiiPhysics,
+	                                                     bool bUseSharedCollision)
+	{
+		KawaiiPhysics.CallAnimNodeFunction<FAnimNode_KawaiiPhysics>(
+			TEXT("SetbUseSharedCollision"),
+			[bUseSharedCollision](FAnimNode_KawaiiPhysics& InKawaiiPhysics) {
+				InKawaiiPhysics.bUseSharedCollision = bUseSharedCollision;
+				InKawaiiPhysics.RequestSharedCollisionReinit();
+			});
+		return KawaiiPhysics;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Kawaii Physics|Shared Collision", meta=(BlueprintThreadSafe))
+	static bool GetUseSharedCollision(const FKawaiiPhysicsReference& KawaiiPhysics)
+	{
+		KAWAIIPHYSICS_VALUE_GETTER(bool, bUseSharedCollision);
+	}
+
+	/**
+	 * 共有コリジョンのグループタグを設定
+	 * Set the group tag for shared collision
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Kawaii Physics|Shared Collision", meta=(BlueprintThreadSafe))
+	static FKawaiiPhysicsReference SetSharedCollisionGroupTag(const FKawaiiPhysicsReference& KawaiiPhysics,
+	                                                          FGameplayTag SharedCollisionGroupTag)
+	{
+		KawaiiPhysics.CallAnimNodeFunction<FAnimNode_KawaiiPhysics>(
+			TEXT("SetSharedCollisionGroupTag"),
+			[SharedCollisionGroupTag](FAnimNode_KawaiiPhysics& InKawaiiPhysics) {
+				InKawaiiPhysics.SharedCollisionGroupTag = SharedCollisionGroupTag;
+				InKawaiiPhysics.RequestSharedCollisionReinit();
+			});
+		return KawaiiPhysics;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Kawaii Physics|Shared Collision", meta=(BlueprintThreadSafe))
+	static FGameplayTag GetSharedCollisionGroupTag(const FKawaiiPhysicsReference& KawaiiPhysics)
+	{
+		KAWAIIPHYSICS_VALUE_GETTER(FGameplayTag, SharedCollisionGroupTag);
+	}
 
 	/** Set ExternalForceParameter template */
 	template <typename ValueType, typename PropertyType>
@@ -466,7 +649,7 @@ ValueType UKawaiiPhysicsLibrary::GetExternalForceProperty(EKawaiiPhysicsAccessEx
                                                           const FKawaiiPhysicsReference& KawaiiPhysics,
                                                           int ExternalForceIndex, FName PropertyName)
 {
-	ValueType Result;
+	ValueType Result{};
 	ExecResult = EKawaiiPhysicsAccessExternalForceResult::NotValid;
 
 	KawaiiPhysics.CallAnimNodeFunction<FAnimNode_KawaiiPhysics>(
@@ -532,7 +715,7 @@ ValueType UKawaiiPhysicsLibrary::GetExternalForceStructProperty(EKawaiiPhysicsAc
                                                                 const FKawaiiPhysicsReference& KawaiiPhysics,
                                                                 int ExternalForceIndex, FName PropertyName)
 {
-	ValueType Result;
+	ValueType Result{};
 	ExecResult = EKawaiiPhysicsAccessExternalForceResult::NotValid;
 
 	KawaiiPhysics.CallAnimNodeFunction<FAnimNode_KawaiiPhysics>(

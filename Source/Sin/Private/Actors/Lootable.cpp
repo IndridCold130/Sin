@@ -4,6 +4,7 @@
 #include "Actors/Lootable.h"
 #include "Inventory/Inventory.h"
 #include "SinPlayerController.h"
+#include "Inventory/SinLootContainerSettings.h"
 
 ALootable::ALootable()
 {
@@ -14,6 +15,7 @@ ALootable::ALootable()
 void ALootable::Focus_Implementation(ASinPlayerController* Controller)
 {
 	Super::Focus_Implementation(Controller);
+	EnsureLootGenerated();
 	//Controller->MainHUD->ToggleToolTip(true, GetToolTipInfo_Implementation());
 }
 
@@ -26,8 +28,9 @@ void ALootable::EndFocus_Implementation(ASinPlayerController* Controller)
 void ALootable::Interact_Implementation(ASinPlayerController* Caller)
 {
 	Super::Interact_Implementation(Caller);
+	//EnsureLootGenerated();
+	Super::Interact_Implementation(Caller);
 	Caller->LoadSinMenu(TAG_Menu_Loot, this, true);
-	//Caller->MainHUD->ToggleInteractableMenu(EInteractionMenu::Loot, Loot);
 }
 
 UInventory* ALootable::GetInventory_Implementation()
@@ -44,4 +47,16 @@ FString ALootable::GetToolTipInfo_Implementation()
 {
 	return Super::GetToolTipInfo_Implementation();
 	//return TEXT("Default Value");
+}
+
+void ALootable::EnsureLootGenerated()
+{
+	if (bHasGeneratedLoot || !LootSettings || !Loot)
+	{
+		return;
+	}
+
+	Loot->EnsureContainerIds();
+	LootSettings->GenerateInto(Loot);
+	bHasGeneratedLoot = true;
 }

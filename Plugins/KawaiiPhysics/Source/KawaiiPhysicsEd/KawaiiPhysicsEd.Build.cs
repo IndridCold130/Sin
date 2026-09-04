@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2019-2026 pafuhana1213. All Rights Reserved.
 
 using UnrealBuildTool;
 
@@ -8,29 +8,37 @@ public class KawaiiPhysicsEd : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PrivateDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "InputCore", "KawaiiPhysics" });
 		PrivateDependencyModuleNames.AddRange(new[]
 		{
-			"AnimGraph", "BlueprintGraph", "Persona", "UnrealEd", "AnimGraphRuntime", "Slate", "SlateCore",
-			"StructUtils"
+			"Core",
+			"CoreUObject",
+			"Engine",
+			"InputCore",
+			"KawaiiPhysics",
+			"AnimGraph",
+			"BlueprintGraph",
+			"Persona",
+			"UnrealEd",
+			"AnimGraphRuntime",
+			"Slate",
+			"SlateCore",
+			"DeveloperSettings"
 		});
 
-		BuildVersion Version;
-		if (BuildVersion.TryRead(BuildVersion.GetDefaultFileName(), out Version))
-			if (Version.MajorVersion == 5)
+		if(Target.Version.MajorVersion >= 5)
+		{
+			PrivateDependencyModuleNames.Add("EditorFramework");
+			// AnimationEditMode was split into its own module starting from 5.1
+			if (Target.Version.MajorVersion > 5 || Target.Version.MinorVersion >= 1)
 			{
-				PrivateDependencyModuleNames.AddRange(new[] { "EditorFramework" });
-
-				// From UE5.1, BaseClass of EditMode move to new Module 
-				if (Version.MinorVersion >= 1) PrivateDependencyModuleNames.AddRange(new[] { "AnimationEditMode" });
+				PrivateDependencyModuleNames.Add("AnimationEditMode");
 			}
 
-		// Uncomment if you are using Slate UI
-		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
-
-		// Uncomment if you are using online features
-		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
-
-		// To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
+			// StructUtils plugin has been integrated into the engine starting from 5.5
+			if (Target.Version.MajorVersion == 5 && Target.Version.MinorVersion <= 4)
+			{
+				PrivateDependencyModuleNames.Add("StructUtils");
+			}
+		}
 	}
 }

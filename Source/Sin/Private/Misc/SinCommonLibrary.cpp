@@ -137,14 +137,14 @@ FText USinCommonLibrary::FormatPerkDescription(const int32 CurrentRank, const FS
  // TSoftClassPtr<UObject>
 // TSubclassOf<UObject>
 // TSubclassOf<UClass>
-FAsyncCoroutine USinCommonLibrary::SinLoadClassTris(FLatentActionInfo LatentInfo, TSoftClassPtr<UObject> Asset, EAssetLoadedOp& Completed, TSubclassOf<UObject>& Class)
+FVoidCoroutine USinCommonLibrary::SinLoadClassTris(FLatentActionInfo LatentInfo, TSoftClassPtr<UObject> Asset, EAssetLoadedOp& Completed, TSubclassOf<UObject>& Class)
 {
 	Class = Cast<UClass>(co_await UE5Coro::Latent::AsyncLoadClass(Asset));
 	//Class = co_await UE5Coro::Latent::AsyncLoadClass(Asset);
 	Completed = EAssetLoadedOp::Completed;
 }
 
-FAsyncCoroutine USinCommonLibrary::SinLoadDataTable(FLatentActionInfo LatentInfo, TSoftObjectPtr<UObject> SoftTable, EAssetLoadedOp& Completed, UDataTable*& Table)
+FVoidCoroutine USinCommonLibrary::SinLoadDataTable(FLatentActionInfo LatentInfo, TSoftObjectPtr<UObject> SoftTable, EAssetLoadedOp& Completed, UDataTable*& Table)
 {
 	Table = nullptr;
 	UObject* LoadedObject = co_await UE5Coro::Latent::AsyncLoadObject(SoftTable);
@@ -153,7 +153,7 @@ FAsyncCoroutine USinCommonLibrary::SinLoadDataTable(FLatentActionInfo LatentInfo
 	Completed = Table ? EAssetLoadedOp::Completed : EAssetLoadedOp::Failed;
 }
 
-FAsyncCoroutine USinCommonLibrary::SinLoadSkeletalMeshes(FLatentActionInfo LatentInfo, TArray<TSoftObjectPtr<UObject>> Assets, EAssetLoadedOp& Completed, TArray<UObject*>& SkeletalMeshes)
+FVoidCoroutine USinCommonLibrary::SinLoadSkeletalMeshes(FLatentActionInfo LatentInfo, TArray<TSoftObjectPtr<UObject>> Assets, EAssetLoadedOp& Completed, TArray<UObject*>& SkeletalMeshes)
 {
 	SkeletalMeshes = co_await UE5Coro::Latent::AsyncLoadObjects(Assets);
 	Completed = EAssetLoadedOp::Completed;

@@ -257,7 +257,7 @@ public:
 	UFUNCTION(BlueprintPure, Category="Inventory|Link")
 	bool HasLinkedInventory() const { return LinkedInventory.IsValid(); }
 	
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	bool TryDoubleClickEntry(const FGuid& EntryId);
 	// NEW SYSTEM
 
@@ -266,10 +266,8 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 		TMap<EPrimaryItemType, class UDataTable*> ItemDataTables;
 
-#define LOCTEXT_NAMESPACE "SinNamespace"
 	UPROPERTY(SaveGame, Replicated, EditAnywhere, BlueprintReadWrite, Category = "Inventory")
-		FText InventoryName = LOCTEXT("InventoryKey", "Inventory");
-#undef LOCTEXT_NAMESPACE
+	FText InventoryName = FText::FromString(TEXT("Inventory"));
 
 	UPROPERTY(SaveGame, Replicated, EditAnywhere, BlueprintReadWrite, Category = "Inventory")
 		int32 InventorySize = 40;

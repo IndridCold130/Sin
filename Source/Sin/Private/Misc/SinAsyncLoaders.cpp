@@ -56,58 +56,20 @@ USinClassLoader* USinClassLoader::SinAsyncLoadClass(UObject* WorldContextObject,
 	return Task;
 }
 
-//FLatentActionInfo LatentInfo, 
-//using namespace UE5Coro;
-
-FAsyncCoroutine USinClassLoader::SinLoadClassDeux(UObject* WorldContextObject, TSoftClassPtr<class UObject> Asset, EAssetLoadedOp& Completed, UClass*& Class)
+FVoidCoroutine USinClassLoader::SinLoadClassDeux(
+	UObject* WorldContextObject,
+	FLatentActionInfo LatentInfo,
+	TSoftClassPtr<UObject> Asset,
+	EAssetLoadedOp& Completed,
+	UClass*& Class)
 {
-	this->RegisterWithGameInstance(WorldContextObject);
 	Class = nullptr;
-	//if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull))
-	//{
-		//FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
-		//if (LatentActionManager.FindExistingAction<Start>(LatentInfo.CallbackTarget, LatentInfo.UUID) == nullptr)
-	//}
-	//UE5Coro::Latent::AsyncLoadClass
-	co_await UE5Coro::Latent::AsyncLoadClass(Asset);
-	Class = Asset.Get();
-	Completed = EAssetLoadedOp::Completed;
-	//co_await UE5Coro::Latent::Seconds(1.0f);
+
+	Class = Cast<UClass>(
+		co_await UE5Coro::Latent::AsyncLoadClass(Asset)
+	);
+
+	Completed = Class
+		? EAssetLoadedOp::Completed
+		: EAssetLoadedOp::Failed;
 }
-
-
-
-//Class = nullptr;
-	//co_await 
-	//if (UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull))
-	//{
-		//FLatentActionManager& LatentActionManager = World->GetLatentActionManager();
-		//LatentActionManager.
-	//}
-	//RegisterWithGameInstance(WorldContextObject);
-	//UAssetManager::GetStreamableManager().RequestAsyncLoad(Asset.ToSoftObjectPath(),
-			//FStreamableDelegate::CreateWeakLambda(this, [this, Asset, Class]
-				//{Class = Asset.Get();
-				//})); Completed = EAssetLoadedOp::Completed; return Asset.Get(); SetReadyToDestroy();
-	//if (Asset.Get())
-	//{
-		//Class = Asset.Get();
-		//ReturnClass = Asset.Get();
-	//	Completed = EAssetLoadedOp::Completed;
-		//SetReadyToDestroy();
-	//}
-	//else
-	//{
-		//Completed = EAssetLoadedOp::Failed;
-		//UAssetManager::GetStreamableManager().RequestAsyncLoad(Asset.ToSoftObjectPath(),
-			//FStreamableDelegate::CreateWeakLambda(this, [this, Asset]
-				//{ReturnClass = Asset.Get();
-				//})); Completed = EAssetLoadedOp::Completed; return Asset.Get(); SetReadyToDestroy();
-	//}
-	//Completed = Asset.Get()?  EAssetLoadedOp::Completed : EAssetLoadedOp::Failed;
-	//return;
-	//if(!Asset.Get())
-	//{
-		//Completed = EAssetLoadedOp::Failed;
-		//return nullptr;
-	//}

@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.4",
+	"EngineAssociation": "5.8",
 	"Category": "",
 	"Description": "",
 	"Modules": [
@@ -54,12 +54,12 @@
 		},
 		{
 			"Name": "CPathfinding",
-			"Enabled": true,
+			"Enabled": false,
 			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/c533ad0234c540fb81bdfa7bd55d3514"
 		},
 		{
 			"Name": "ThumbnailGeneratorPro",
-			"Enabled": true,
+			"Enabled": false,
 			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/7b165152e61e4eaeb129e1ae73020811"
 		},
 		{
@@ -68,12 +68,7 @@
 		},
 		{
 			"Name": "NiagaraUIRenderer",
-			"Enabled": true,
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/fd24d23ca57b4c59a4e4b7368da250bd",
-			"SupportedTargetPlatforms": [
-				"Win64",
-				"Android"
-			]
+			"Enabled": true
 		},
 		{
 			"Name": "AnythingToString",
@@ -83,7 +78,7 @@
 		{
 			"Name": "KawaiiPhysics",
 			"Enabled": true,
-			"MarketplaceURL": "KawaiiPhysics : Simple fake Physics for UnrealEngine4&5"
+			"MarketplaceURL": "com.epicgames.launcher://ue/Fab/product/f870c07e-0a02-4a78-a888-e52a22794572"
 		},
 		{
 			"Name": "GameplayAbilities",
@@ -99,7 +94,7 @@
 		},
 		{
 			"Name": "DazToUnreal",
-			"Enabled": true,
+			"Enabled": false,
 			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/070a312bc04c48bcb1a4d193aaddf73e"
 		},
 		{
@@ -118,7 +113,7 @@
 		{
 			"Name": "MySQL",
 			"Enabled": true,
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/4a497572d1014beab577112d5a37c813"
+			"MarketplaceURL": "com.epicgames.launcher://ue/Fab/product/01a659da-76ab-4147-90ca-fc08f1d44ad0"
 		},
 		{
 			"Name": "SQLiteSupport",

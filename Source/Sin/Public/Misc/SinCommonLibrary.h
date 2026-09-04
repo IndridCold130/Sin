@@ -50,13 +50,13 @@ public:
 		static FText FormatPerkDescription(const int32 CurrentRank, const FSinPerkRow& PerkRow); // , UDataTable* Attribute
 
 	UFUNCTION(BlueprintCallable, Category = "SinAsync", meta = (Latent, LatentInfo = "LatentInfo", DeterminesOutputType = "Asset", ExpandEnumAsExecs = "Completed", BlueprintAutocast))
-		static FAsyncCoroutine SinLoadClassTris(FLatentActionInfo LatentInfo, TSoftClassPtr<UObject> Asset, EAssetLoadedOp& Completed, TSubclassOf<UObject>& Class);
+		static FVoidCoroutine SinLoadClassTris(FLatentActionInfo LatentInfo, TSoftClassPtr<UObject> Asset, EAssetLoadedOp& Completed, TSubclassOf<UObject>& Class);
 
 	UFUNCTION(BlueprintCallable, Category = "SinAsync", meta = (Latent, LatentInfo = "LatentInfo", DeterminesOutputType = "Asset", ExpandEnumAsExecs = "Completed", BlueprintAutocast))
-		static FAsyncCoroutine SinLoadDataTable(FLatentActionInfo LatentInfo, TSoftObjectPtr<UObject> SoftTable, EAssetLoadedOp& Completed, UDataTable*& Table);
+		static FVoidCoroutine SinLoadDataTable(FLatentActionInfo LatentInfo, TSoftObjectPtr<UObject> SoftTable, EAssetLoadedOp& Completed, UDataTable*& Table);
 
 	UFUNCTION(BlueprintCallable, Category = "SinAsync", meta = (Latent, LatentInfo = "LatentInfo", DeterminesOutputType = "Asset", ExpandEnumAsExecs = "Completed", BlueprintAutocast))
-		static FAsyncCoroutine SinLoadSkeletalMeshes(FLatentActionInfo LatentInfo, TArray<TSoftObjectPtr<UObject>> Assets, EAssetLoadedOp& Completed, TArray<UObject*>& SkeletalMeshes);
+		static FVoidCoroutine SinLoadSkeletalMeshes(FLatentActionInfo LatentInfo, TArray<TSoftObjectPtr<UObject>> Assets, EAssetLoadedOp& Completed, TArray<UObject*>& SkeletalMeshes);
 
 	UFUNCTION(BlueprintCallable, Category = "SinAsync", meta = (Latent, LatentInfo = "LatentInfo", DeterminesOutputType = "AssetTwo", ExpandEnumAsExecs = "Completed")) //BlueprintAutocast
 		static UClass* SinLoadClassQuatre(FLatentActionInfo LatentInfo, TSubclassOf<UObject> Asset, TSoftClassPtr<UObject> AssetTwo, EAssetLoadedOp& Completed);

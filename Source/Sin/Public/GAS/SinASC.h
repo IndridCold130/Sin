@@ -199,7 +199,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GAS_Class_Management")
 	void GrantAbilities(TArray<TSubclassOf<UGameplayAbility>> Abilities, const FActiveGameplayEffectHandle& ClassHandle);
 	UFUNCTION(BlueprintCallable, Category = "Abilities")
-	FAsyncCoroutine GrantBonusPerks(TArray<FItemGrantedPerk> Perks, bool bGrant = true);
+	FVoidCoroutine GrantBonusPerks(TArray<FItemGrantedPerk> Perks, bool bGrant = true);
 	UFUNCTION(BlueprintCallable, Category = "Passive_Abilities")
 	void GrantPassiveAbilities(const TMap<TSubclassOf<USinGameplayAbility>, int32>& PassiveAbilities);
 	UFUNCTION(BlueprintCallable, Category = "Passive_Abilities")

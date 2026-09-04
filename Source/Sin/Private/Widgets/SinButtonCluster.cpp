@@ -244,10 +244,22 @@ TSoftClassPtr<UUserWidget> USinCarousel::PickSubmenuByTag(FGameplayTag Tag)
 
 void USinCarousel::RotateSubmenu(bool bRight)
 {
-	if (ButtonInstances.IsEmpty()) { return; }
+	if (ButtonInstances.IsEmpty())
+	{
+		return;
+	}
+
 	int32 CurrentIndex = ButtonInstances.Find(ActiveButton);
-	bRight ? FMath::Max(CurrentIndex = (CurrentIndex+1)%ButtonInstances.Num(), 0) : 
-		CurrentIndex =(CurrentIndex + ButtonInstances.Num() - 1) % ButtonInstances.Num();
+
+	if (bRight)
+	{
+		CurrentIndex = (CurrentIndex + 1) % ButtonInstances.Num();
+	}
+	else
+	{
+		CurrentIndex = (CurrentIndex + ButtonInstances.Num() - 1) % ButtonInstances.Num();
+	}
+
 	HandleButtonClicked(ButtonInstances[CurrentIndex]);
 }
 

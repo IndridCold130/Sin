@@ -55,6 +55,13 @@ protected:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory|Context Menu")
 	TSubclassOf<USinItemContextMenuButton> ContextMenuButtonClass;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Context Menu|Audio")
+	TSoftObjectPtr<USoundBase> DefaultClickSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Context Menu|Audio")
+	TSoftObjectPtr<USoundBase> ActionFailedSound;
+	
 	//virtual void NativeOnFocusLost(const FFocusEvent& InFocusEvent) override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry,const FKeyEvent& InKeyEvent) override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry,const FPointerEvent& InMouseEvent) override;

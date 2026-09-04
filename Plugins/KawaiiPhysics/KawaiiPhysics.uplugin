@@ -1,19 +1,18 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "1.17.0.Preview",
+	"VersionName": "1.21.0",
 	"FriendlyName": "KawaiiPhysics",
-	"Description": "",
+	"Description": "Simple Bone Physics for UnrealEngine4 & 5",
 	"Category": "Animation",
 	"CreatedBy": "pafuhana1213",
 	"CreatedByURL": "https://twitter.com/pafuhana1213",
 	"DocsURL": "https://github.com/pafuhana1213/KawaiiPhysics",
-	"MarketplaceURL": "KawaiiPhysics : Simple fake Physics for UnrealEngine4&5",
+	"MarketplaceURL": "com.epicgames.launcher://ue/Fab/product/f870c07e-0a02-4a78-a888-e52a22794572",
 	"SupportURL": "https://github.com/pafuhana1213/KawaiiPhysics/issues",
+	"EngineVersion": "5.8.0",
 	"CanContainContent": false,
-	"IsBetaVersion": false,
-	"IsExperimentalVersion": false,
-	"Installed": false,
+	"Installed": true,
 	"Modules": [
 		{
 			"Name": "KawaiiPhysics",
@@ -23,13 +22,12 @@
 		{
 			"Name": "KawaiiPhysicsEd",
 			"Type": "UncookedOnly",
-			"LoadingPhase": "PreDefault"
-		}
-	],
-	"Plugins": [
-		{
-			"Name": "StructUtils",
-			"Enabled": true
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac",
+				"Linux"
+			]
 		}
 	]
 }

@@ -1,14 +1,17 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Copyright 2019-2026 pafuhana1213. All Rights Reserved.
 
 
 #include "KawaiiPhysicsBoneConstraintsDataAsset.h"
 
 #include "KawaiiPhysics.h"
+#include "Animation/Skeleton.h"
 #include "Internationalization/Regex.h"
 
 #if WITH_EDITOR
 #include "Editor.h"
 #endif
+
+#include UE_INLINE_GENERATED_CPP_BY_NAME(KawaiiPhysicsBoneConstraintsDataAsset)
 
 struct FBoneConstraintDataCustomVersion
 {
@@ -36,18 +39,27 @@ FCustomVersionRegistration GRegisterBoneConstraintDataCustomVersion(FBoneConstra
                                                                     FBoneConstraintDataCustomVersion::LatestVersion,
                                                                     TEXT("BoneConstraintData"));
 
+void FModifyBoneConstraintData::Update(const FModifyBoneConstraint& BoneConstraint)
+{
+	BoneReference1 = BoneConstraint.Bone1;
+	BoneReference2 = BoneConstraint.Bone2;
+	bOverrideCompliance = BoneConstraint.bOverrideCompliance;
+	ComplianceType = BoneConstraint.ComplianceType;
+	bExcludeFromSubdivision = BoneConstraint.bExcludeFromSubdivision;
+}
 
 TArray<FModifyBoneConstraint> UKawaiiPhysicsBoneConstraintsDataAsset::GenerateBoneConstraints()
 {
 	TArray<FModifyBoneConstraint> BoneConstraints;
 
-	for (const FModifyBoneConstraintData &BoneConstraintData : BoneConstraintsData)
+	for (const FModifyBoneConstraintData& BoneConstraintData : BoneConstraintsData)
 	{
 		FModifyBoneConstraint BoneConstraint;
 		BoneConstraint.Bone1 = BoneConstraintData.BoneReference1;
 		BoneConstraint.Bone2 = BoneConstraintData.BoneReference2;
 		BoneConstraint.bOverrideCompliance = BoneConstraintData.bOverrideCompliance;
 		BoneConstraint.ComplianceType = BoneConstraintData.ComplianceType;
+		BoneConstraint.bExcludeFromSubdivision = BoneConstraintData.bExcludeFromSubdivision;
 
 		BoneConstraints.Add(BoneConstraint);
 	}

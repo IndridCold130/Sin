@@ -72,6 +72,12 @@ public:
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true", DeterminesOutputType = "Asset", WorldContext = "WorldContextObject"), Category = "SinAsync")
 		static USinClassLoader* SinAsyncLoadClass(UObject* WorldContextObject, TSoftClassPtr<class UObject> Asset); //TSoftClassPtr<UObject> AssetClass 
 
-	UFUNCTION(BlueprintCallable, Category = "SinAsync", meta = (DeterminesOutputType = "Asset", WorldContext = "WorldContextObject", ExpandEnumAsExecs = "Completed"))
-		FAsyncCoroutine SinLoadClassDeux(UObject* WorldContextObject, TSoftClassPtr<class UObject> Asset, EAssetLoadedOp& Completed, UClass*& Class);
+	UFUNCTION(BlueprintCallable, Category = "SinAsync",
+	meta = (Latent, LatentInfo = "LatentInfo", DeterminesOutputType = "Asset", WorldContext = "WorldContextObject", ExpandEnumAsExecs = "Completed"))
+	static FVoidCoroutine SinLoadClassDeux(
+	UObject* WorldContextObject,
+	FLatentActionInfo LatentInfo,
+	TSoftClassPtr<UObject> Asset,
+	EAssetLoadedOp& Completed,
+	UClass*& Class);
 };

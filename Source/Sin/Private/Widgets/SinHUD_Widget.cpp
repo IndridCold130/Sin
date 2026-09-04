@@ -8,7 +8,6 @@
 #include "SinPlayerController.h"
 #include "Widgets/SinToolTip_Interact.h"
 #include "Widgets/EquipmentPanel.h"
-#include "UE5Coro/LatentAwaiters.h"
 
 void USinHUD::NativeOnInitialized()
 {

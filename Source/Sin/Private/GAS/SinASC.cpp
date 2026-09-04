@@ -942,7 +942,7 @@ void USinASC::GrantAbilities(TArray<TSubclassOf<UGameplayAbility>> Abilities, co
 	}
 }
 
-FAsyncCoroutine USinASC::GrantBonusPerks(TArray<FItemGrantedPerk> Perks, bool bGrant)
+FVoidCoroutine USinASC::GrantBonusPerks(TArray<FItemGrantedPerk> Perks, bool bGrant)
 {
 	for (const FItemGrantedPerk& Perk : Perks)
 	{
